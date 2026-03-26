@@ -1,0 +1,20 @@
+[Unit]
+Description=SysWall Firewall Daemon
+After=network.target
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/syswall-daemon
+Environment=SYSWALL_CONFIG=/etc/syswall/config.toml
+User=root
+Restart=on-failure
+RestartSec=5s
+WatchdogSec=30s
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/syswall /var/log/syswall /var/run/syswall
+
+[Install]
+WantedBy=multi-user.target
