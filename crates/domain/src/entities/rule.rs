@@ -10,6 +10,12 @@ use crate::value_objects::{Direction, ExecutablePath, Port, Protocol, RulePriori
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RuleId(Uuid);
 
+impl Default for RuleId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RuleId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())

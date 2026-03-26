@@ -21,6 +21,12 @@ pub struct FakeFirewallEngine {
     pub calls: Mutex<Vec<FirewallCall>>,
 }
 
+impl Default for FakeFirewallEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakeFirewallEngine {
     pub fn new() -> Self {
         Self {

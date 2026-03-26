@@ -157,17 +157,15 @@ impl PolicyEngine {
             }
         }
 
-        if let Some(ref proto) = criteria.protocol {
-            if connection.protocol != *proto {
+        if let Some(ref proto) = criteria.protocol
+            && connection.protocol != *proto {
                 return false;
             }
-        }
 
-        if let Some(ref dir) = criteria.direction {
-            if connection.direction != *dir {
+        if let Some(ref dir) = criteria.direction
+            && connection.direction != *dir {
                 return false;
             }
-        }
 
         // Schedule matching deferred to sub-project 4
 

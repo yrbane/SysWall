@@ -9,6 +9,12 @@ use crate::value_objects::{Direction, ExecutablePath, Protocol, SocketAddress};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ConnectionId(Uuid);
 
+impl Default for ConnectionId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConnectionId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())

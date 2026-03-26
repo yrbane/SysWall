@@ -11,6 +11,12 @@ pub struct FakeDecisionRepository {
     pub decisions: Mutex<Vec<Decision>>,
 }
 
+impl Default for FakeDecisionRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakeDecisionRepository {
     pub fn new() -> Self {
         Self {

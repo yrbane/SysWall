@@ -13,6 +13,12 @@ pub struct FakeRuleRepository {
     rules: Mutex<HashMap<RuleId, Rule>>,
 }
 
+impl Default for FakeRuleRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakeRuleRepository {
     pub fn new() -> Self {
         Self {

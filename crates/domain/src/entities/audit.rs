@@ -8,6 +8,12 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EventId(Uuid);
 
+impl Default for EventId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())

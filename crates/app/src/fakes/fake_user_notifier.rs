@@ -13,6 +13,12 @@ pub struct FakeUserNotifier {
     pub notifications: Mutex<Vec<Notification>>,
 }
 
+impl Default for FakeUserNotifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakeUserNotifier {
     pub fn new() -> Self {
         Self {

@@ -10,6 +10,12 @@ use super::rule::RuleId;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PendingDecisionId(Uuid);
 
+impl Default for PendingDecisionId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PendingDecisionId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
@@ -64,6 +70,12 @@ impl PendingDecision {
 /// Identifiant unique d'une décision résolue.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DecisionId(Uuid);
+
+impl Default for DecisionId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl DecisionId {
     pub fn new() -> Self {

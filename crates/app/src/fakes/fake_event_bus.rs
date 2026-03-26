@@ -11,6 +11,12 @@ pub struct FakeEventBus {
     sender: broadcast::Sender<DomainEvent>,
 }
 
+impl Default for FakeEventBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakeEventBus {
     pub fn new() -> Self {
         let (sender, _) = broadcast::channel(256);

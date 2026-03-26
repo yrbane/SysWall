@@ -8,6 +8,12 @@ use syswall_domain::ports::ProcessResolver;
 /// Résolveur de processus factice en mémoire pour les tests (retourne toujours None).
 pub struct FakeProcessResolver;
 
+impl Default for FakeProcessResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakeProcessResolver {
     pub fn new() -> Self {
         Self

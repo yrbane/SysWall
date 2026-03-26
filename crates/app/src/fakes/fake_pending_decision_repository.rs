@@ -13,6 +13,12 @@ pub struct FakePendingDecisionRepository {
     decisions: Mutex<HashMap<PendingDecisionId, PendingDecision>>,
 }
 
+impl Default for FakePendingDecisionRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakePendingDecisionRepository {
     pub fn new() -> Self {
         Self {

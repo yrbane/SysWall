@@ -8,6 +8,12 @@ use syswall_domain::ports::{ConnectionEventStream, ConnectionMonitor};
 /// Moniteur de connexion factice en mémoire pour les tests (retourne des flux vides).
 pub struct FakeConnectionMonitor;
 
+impl Default for FakeConnectionMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakeConnectionMonitor {
     pub fn new() -> Self {
         Self

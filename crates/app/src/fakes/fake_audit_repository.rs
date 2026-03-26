@@ -12,6 +12,12 @@ pub struct FakeAuditRepository {
     pub events: Mutex<Vec<AuditEvent>>,
 }
 
+impl Default for FakeAuditRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakeAuditRepository {
     pub fn new() -> Self {
         Self {
