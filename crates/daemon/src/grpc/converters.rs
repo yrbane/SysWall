@@ -4,14 +4,17 @@
 use chrono::Utc;
 use syswall_app::commands::{CreateRuleCommand, RespondToDecisionCommand};
 use syswall_domain::entities::{
-    DecisionAction, DecisionGranularity, PendingDecision, PendingDecisionId,
-    PendingDecisionStatus, Rule, RuleCriteria, RuleEffect, RuleScope, RuleSource,
+    AuditEvent, AuditStats, DecisionAction, DecisionGranularity, EventCategory, PendingDecision,
+    PendingDecisionId, PendingDecisionStatus, Rule, RuleCriteria, RuleEffect, RuleScope,
+    RuleSource, Severity,
 };
 use syswall_domain::errors::DomainError;
 use syswall_domain::events::{DomainEvent, FirewallStatus};
+use syswall_domain::ports::AuditFilters;
 use syswall_proto::syswall::{
-    CreateRuleRequest, DecisionResponseRequest, DomainEventMessage, PendingDecisionMessage,
-    RuleMessage, StatusResponse,
+    AuditEventMessage, AuditLogRequest, CreateRuleRequest, DashboardStatsResponse,
+    DecisionResponseRequest, DomainEventMessage, PendingDecisionMessage, RuleMessage,
+    StatusResponse,
 };
 
 // ---------------------------------------------------------------------------
@@ -220,6 +223,107 @@ pub fn status_to_proto(status: &FirewallStatus) -> StatusResponse {
         nftables_synced: status.nftables_synced,
         uptime_secs: status.uptime_secs,
         version: status.version.clone(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Audit conversions
+// ---------------------------------------------------------------------------
+
+/// Convert a domain AuditEvent to a proto AuditEventMessage.
+/// Convertit un AuditEvent du domaine en AuditEventMessage proto.
+pub fn audit_event_to_proto(event: &AuditEvent) -> AuditEventMessage {
+    AuditEventMessage {
+        id: event.id.as_uuid().to_string(),
+        timestamp: event.timestamp.to_rfc3339(),
+        severity: serde_json::to_string(&event.severity)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_string(),
+        category: serde_json::to_string(&event.category)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_string(),
+        description: event.description.clone(),
+        metadata_json: serde_json::to_string(&event.metadata).unwrap_or_default(),
+    }
+}
+
+/// Convert a proto AuditLogRequest to domain AuditFilters.
+/// Convertit une AuditLogRequest proto en AuditFilters du domaine.
+pub fn proto_to_audit_filters(req: &AuditLogRequest) -> AuditFilters {
+    AuditFilters {
+        severity: if req.severity.is_empty() {
+            None
+        } else {
+            parse_severity(&req.severity).ok()
+        },
+        category: if req.category.is_empty() {
+            None
+        } else {
+            parse_event_category(&req.category).ok()
+        },
+        search: if req.search.is_empty() {
+            None
+        } else {
+            Some(req.search.clone())
+        },
+        from: if req.from.is_empty() {
+            None
+        } else {
+            chrono::DateTime::parse_from_rfc3339(&req.from)
+                .ok()
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+        },
+        to: if req.to.is_empty() {
+            None
+        } else {
+            chrono::DateTime::parse_from_rfc3339(&req.to)
+                .ok()
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+        },
+    }
+}
+
+/// Convert domain AuditStats to a proto DashboardStatsResponse.
+/// Convertit des AuditStats du domaine en DashboardStatsResponse proto.
+pub fn audit_stats_to_proto(stats: &AuditStats) -> DashboardStatsResponse {
+    DashboardStatsResponse {
+        total_events: stats.total,
+        by_category: stats.by_category.clone(),
+        by_severity: stats.by_severity.clone(),
+    }
+}
+
+/// Parse a string to a Severity enum.
+/// Analyse une chaîne vers l'énumération Severity.
+fn parse_severity(s: &str) -> Result<Severity, tonic::Status> {
+    match s {
+        "Debug" => Ok(Severity::Debug),
+        "Info" => Ok(Severity::Info),
+        "Warning" => Ok(Severity::Warning),
+        "Error" => Ok(Severity::Error),
+        "Critical" => Ok(Severity::Critical),
+        _ => Err(tonic::Status::invalid_argument(format!(
+            "Unknown severity: '{}'. Expected: Debug, Info, Warning, Error, Critical",
+            s
+        ))),
+    }
+}
+
+/// Parse a string to an EventCategory enum.
+/// Analyse une chaîne vers l'énumération EventCategory.
+fn parse_event_category(s: &str) -> Result<EventCategory, tonic::Status> {
+    match s {
+        "Connection" => Ok(EventCategory::Connection),
+        "Rule" => Ok(EventCategory::Rule),
+        "Decision" => Ok(EventCategory::Decision),
+        "System" => Ok(EventCategory::System),
+        "Config" => Ok(EventCategory::Config),
+        _ => Err(tonic::Status::invalid_argument(format!(
+            "Unknown category: '{}'. Expected: Connection, Rule, Decision, System, Config",
+            s
+        ))),
     }
 }
 
@@ -554,6 +658,82 @@ mod tests {
     fn error_mapping_not_permitted() {
         let status = domain_error_to_status(DomainError::NotPermitted("nope".to_string()));
         assert_eq!(status.code(), tonic::Code::PermissionDenied);
+    }
+
+    #[test]
+    fn audit_event_to_proto_all_fields() {
+        use syswall_domain::entities::{AuditEvent, EventCategory, Severity};
+        let event = AuditEvent::new(Severity::Warning, EventCategory::Rule, "Test audit event")
+            .with_metadata("key", "value");
+        let msg = audit_event_to_proto(&event);
+
+        assert_eq!(msg.id, event.id.as_uuid().to_string());
+        assert_eq!(msg.severity, "Warning");
+        assert_eq!(msg.category, "Rule");
+        assert_eq!(msg.description, "Test audit event");
+        assert!(msg.metadata_json.contains("key"));
+    }
+
+    #[test]
+    fn proto_to_audit_filters_empty_strings() {
+        let req = AuditLogRequest {
+            severity: String::new(),
+            category: String::new(),
+            search: String::new(),
+            from: String::new(),
+            to: String::new(),
+            offset: 0,
+            limit: 50,
+        };
+        let filters = proto_to_audit_filters(&req);
+        assert!(filters.severity.is_none());
+        assert!(filters.category.is_none());
+        assert!(filters.search.is_none());
+        assert!(filters.from.is_none());
+        assert!(filters.to.is_none());
+    }
+
+    #[test]
+    fn proto_to_audit_filters_with_values() {
+        let req = AuditLogRequest {
+            severity: "Error".to_string(),
+            category: "System".to_string(),
+            search: "nftables".to_string(),
+            from: "2026-01-01T00:00:00Z".to_string(),
+            to: "2026-12-31T23:59:59Z".to_string(),
+            offset: 0,
+            limit: 50,
+        };
+        let filters = proto_to_audit_filters(&req);
+        assert_eq!(filters.severity, Some(Severity::Error));
+        assert_eq!(filters.category, Some(EventCategory::System));
+        assert_eq!(filters.search, Some("nftables".to_string()));
+        assert!(filters.from.is_some());
+        assert!(filters.to.is_some());
+    }
+
+    #[test]
+    fn audit_stats_to_proto_maps_all_fields() {
+        use std::collections::HashMap;
+        let stats = AuditStats {
+            total: 42,
+            by_category: {
+                let mut m = HashMap::new();
+                m.insert("Rule".to_string(), 20);
+                m.insert("System".to_string(), 22);
+                m
+            },
+            by_severity: {
+                let mut m = HashMap::new();
+                m.insert("Info".to_string(), 30);
+                m.insert("Error".to_string(), 12);
+                m
+            },
+        };
+        let msg = audit_stats_to_proto(&stats);
+        assert_eq!(msg.total_events, 42);
+        assert_eq!(*msg.by_category.get("Rule").unwrap(), 20);
+        assert_eq!(*msg.by_severity.get("Error").unwrap(), 12);
     }
 
     #[test]
