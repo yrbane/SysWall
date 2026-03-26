@@ -114,7 +114,7 @@ impl Connection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::IpAddr;
+    use crate::value_objects::Port;
 
     fn test_connection() -> Connection {
         Connection {
