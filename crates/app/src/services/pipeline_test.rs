@@ -46,6 +46,7 @@ mod tests {
                 name: "firefox".to_string(),
                 path: None,
                 cmdline: None,
+                icon: None,
             }),
             user: Some(SystemUser {
                 uid: 1000,

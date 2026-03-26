@@ -249,6 +249,7 @@ mod tests {
                 name: "firefox".to_string(),
                 path: Some(ExecutablePath::new("/usr/bin/firefox".into()).unwrap()),
                 cmdline: None,
+                icon: None,
             }),
             user: Some(SystemUser {
                 uid: 1000,

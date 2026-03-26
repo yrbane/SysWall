@@ -17,6 +17,7 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 lru = { workspace = true }
 nix = { workspace = true }
+dirs = "6"
 
 [features]
 integration = []

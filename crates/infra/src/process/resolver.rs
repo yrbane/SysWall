@@ -35,6 +35,7 @@ impl Default for ProcfsConfig {
 /// Resolveur de processus reel base sur /proc.
 pub struct ProcfsProcessResolver {
     cache: ProcessCache,
+    icon_resolver: super::icon_resolver::IconResolver,
 }
 
 impl ProcfsProcessResolver {
@@ -49,6 +50,7 @@ impl ProcfsProcessResolver {
 
         Ok(Self {
             cache: ProcessCache::new(config.cache_capacity, config.cache_ttl),
+            icon_resolver: super::icon_resolver::IconResolver::new(),
         })
     }
 
@@ -97,6 +99,7 @@ impl ProcfsProcessResolver {
                 name: status.name,
                 path: exe_path,
                 cmdline,
+                icon: None, // Resolved later by icon_resolver
             },
             user,
         ))
@@ -214,12 +217,18 @@ impl ProcessResolver for ProcfsProcessResolver {
                 DomainError::Infrastructure(format!("spawn_blocking failed: {}", e))
             })?;
 
-        if let Some((ref info, ref user)) = result {
+        if let Some((mut info, ref user)) = result {
+            // Resolve icon
+            info.icon = self.icon_resolver.resolve(
+                &info.name,
+                info.path.as_ref().map(|p| p.as_path()),
+            );
             self.cache
                 .insert_pid(pid, info.clone(), user.clone());
+            return Ok(Some(info));
         }
 
-        Ok(result.map(|(info, _)| info))
+        Ok(None)
     }
 
     /// Resolve process info by connection 5-tuple.
@@ -281,13 +290,19 @@ impl ProcessResolver for ProcfsProcessResolver {
                 DomainError::Infrastructure(format!("spawn_blocking failed: {}", e))
             })?;
 
-        if let Some((ref info, ref user)) = result {
+        if let Some((mut info, ref user)) = result {
+            // Resolve icon
+            info.icon = self.icon_resolver.resolve(
+                &info.name,
+                info.path.as_ref().map(|p| p.as_path()),
+            );
             self.cache
                 .insert_inode(inode, info.clone(), user.clone());
             self.cache
                 .insert_pid(pid, info.clone(), user.clone());
+            return Ok(Some(info));
         }
 
-        Ok(result.map(|(info, _)| info))
+        Ok(None)
     }
 }

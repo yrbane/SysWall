@@ -59,6 +59,9 @@ pub struct ProcessInfo {
     pub name: String,
     pub path: Option<ExecutablePath>,
     pub cmdline: Option<String>,
+    /// Path to the application icon (PNG/SVG), if resolved.
+    /// Chemin vers l'icône de l'application (PNG/SVG), si résolu.
+    pub icon: Option<String>,
 }
 
 /// System user owning a process.
@@ -141,6 +144,7 @@ mod tests {
                 name: "firefox".to_string(),
                 path: Some(ExecutablePath::new("/usr/bin/firefox".into()).unwrap()),
                 cmdline: Some("firefox https://example.com".to_string()),
+                icon: None,
             }),
             user: Some(SystemUser {
                 uid: 1000,

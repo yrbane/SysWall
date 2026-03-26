@@ -98,6 +98,7 @@ mod tests {
             name: format!("proc-{}", pid),
             path: None,
             cmdline: None,
+                icon: None,
         }
     }
 
