@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package syswall;
+
+// --- Control Service (request/response) ---
+
+service SysWallControl {
+    rpc GetStatus(Empty) returns (StatusResponse);
+    rpc ListRules(RuleFiltersRequest) returns (RuleListResponse);
+    rpc CreateRule(CreateRuleRequest) returns (RuleResponse);
+    rpc DeleteRule(RuleIdRequest) returns (Empty);
+    rpc ToggleRule(ToggleRuleRequest) returns (RuleResponse);
+    rpc RespondToDecision(DecisionResponseRequest) returns (DecisionAck);
+    rpc ListPendingDecisions(Empty) returns (PendingDecisionListResponse);
+}
+
+// --- Event Service (streaming) ---
+
+service SysWallEvents {
+    rpc SubscribeEvents(SubscribeRequest) returns (stream DomainEventMessage);
+}
+
+// --- Messages ---
+
+message Empty {}
+
+message StatusResponse {
+    bool enabled = 1;
+    uint32 active_rules_count = 2;
+    bool nftables_synced = 3;
+    uint64 uptime_secs = 4;
+    string version = 5;
+}
+
+message RuleFiltersRequest {
+    uint64 offset = 1;
+    uint64 limit = 2;
+}
+
+message RuleListResponse {
+    repeated RuleMessage rules = 1;
+}
+
+message RuleMessage {
+    string id = 1;
+    string name = 2;
+    uint32 priority = 3;
+    bool enabled = 4;
+    string criteria_json = 5;
+    string effect = 6;
+    string scope_json = 7;
+    string source = 8;
+    string created_at = 9;
+    string updated_at = 10;
+}
+
+message CreateRuleRequest {
+    string name = 1;
+    uint32 priority = 2;
+    string criteria_json = 3;
+    string effect = 4;
+    string scope_json = 5;
+    string source = 6;
+}
+
+message RuleResponse {
+    RuleMessage rule = 1;
+}
+
+message RuleIdRequest {
+    string id = 1;
+}
+
+message ToggleRuleRequest {
+    string id = 1;
+    bool enabled = 2;
+}
+
+message DecisionResponseRequest {
+    string pending_decision_id = 1;
+    string action = 2;
+    string granularity = 3;
+}
+
+message DecisionAck {
+    string decision_id = 1;
+}
+
+message PendingDecisionMessage {
+    string id = 1;
+    string snapshot_json = 2;
+    string requested_at = 3;
+    string expires_at = 4;
+    string status = 5;
+}
+
+message PendingDecisionListResponse {
+    repeated PendingDecisionMessage decisions = 1;
+}
+
+message SubscribeRequest {}
+
+message DomainEventMessage {
+    string event_type = 1;
+    string payload_json = 2;
+    string timestamp = 3;
+}

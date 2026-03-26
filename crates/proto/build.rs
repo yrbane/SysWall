@@ -1,4 +1,7 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Proto file will be added in Task 16
+    tonic_build::configure()
+        .build_server(true)
+        .build_client(true)
+        .compile_protos(&["../../proto/syswall.proto"], &["../../proto/"])?;
     Ok(())
 }
