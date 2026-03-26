@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
 use crate::entities::{
-    AuditEvent, Decision, EventCategory, PendingDecision, PendingDecisionId, Rule, RuleEffect,
-    RuleId, RuleSource, Severity,
+    AuditEvent, AuditStats, Decision, EventCategory, PendingDecision, PendingDecisionId, Rule,
+    RuleEffect, RuleId, RuleSource, Severity,
 };
 use crate::errors::DomainError;
 use crate::events::Pagination;
@@ -56,6 +56,25 @@ pub trait AuditRepository: Send + Sync {
         pagination: &Pagination,
     ) -> Result<Vec<AuditEvent>, DomainError>;
     async fn count(&self, filters: &AuditFilters) -> Result<u64, DomainError>;
+
+    /// Append multiple events in a single batch (transactional).
+    /// Ajoute plusieurs événements en un seul lot (transactionnel).
+    async fn append_batch(&self, events: &[AuditEvent]) -> Result<(), DomainError>;
+
+    /// Delete all events with timestamp before the given cutoff. Returns count deleted.
+    /// Supprime tous les événements antérieurs au seuil donné. Retourne le nombre supprimé.
+    async fn delete_before(
+        &self,
+        before: chrono::DateTime<chrono::Utc>,
+    ) -> Result<u64, DomainError>;
+
+    /// Get aggregated statistics for events in the given time range.
+    /// Obtient les statistiques agrégées pour les événements dans la plage temporelle donnée.
+    async fn get_stats(
+        &self,
+        from: chrono::DateTime<chrono::Utc>,
+        to: chrono::DateTime<chrono::Utc>,
+    ) -> Result<AuditStats, DomainError>;
 }
 
 /// Repository for resolved decisions.

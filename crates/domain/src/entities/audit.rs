@@ -88,6 +88,21 @@ impl AuditEvent {
     }
 }
 
+/// Aggregated audit statistics for a time range.
+/// Statistiques d'audit agrégées pour une plage temporelle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditStats {
+    /// Total number of events in the time range.
+    /// Nombre total d'événements dans la plage temporelle.
+    pub total: u64,
+    /// Event counts grouped by category (key: category string, value: count).
+    /// Nombre d'événements par catégorie (clé : chaîne de catégorie, valeur : nombre).
+    pub by_category: HashMap<String, u64>,
+    /// Event counts grouped by severity (key: severity string, value: count).
+    /// Nombre d'événements par sévérité (clé : chaîne de sévérité, valeur : nombre).
+    pub by_severity: HashMap<String, u64>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
