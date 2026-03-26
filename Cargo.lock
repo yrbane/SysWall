@@ -1202,7 +1202,13 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "futures",
+ "http",
+ "http-body",
+ "hyper",
+ "hyper-util",
+ "nix",
  "serde",
+ "serde_json",
  "syswall-app",
  "syswall-domain",
  "syswall-infra",
@@ -1212,8 +1218,10 @@ dependencies = [
  "tokio-util",
  "toml",
  "tonic",
+ "tower 0.5.3",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -1340,6 +1348,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
