@@ -44,6 +44,26 @@ pub struct FirewallConfig {
     pub default_policy: DefaultPolicyConfig,
     pub rollback_timeout_secs: u64,
     pub nftables_table_name: String,
+    #[serde(default = "default_nft_path")]
+    pub nft_binary_path: std::path::PathBuf,
+    #[serde(default = "default_nft_timeout")]
+    pub nft_command_timeout_secs: u64,
+    #[serde(default = "default_nft_max_output")]
+    pub nft_max_output_bytes: usize,
+    #[serde(default)]
+    pub use_fake: bool,
+}
+
+fn default_nft_path() -> std::path::PathBuf {
+    std::path::PathBuf::from("/usr/sbin/nft")
+}
+
+fn default_nft_timeout() -> u64 {
+    5
+}
+
+fn default_nft_max_output() -> usize {
+    1_048_576
 }
 
 /// Default policy enum as read from configuration.
@@ -72,7 +92,27 @@ impl From<&DefaultPolicyConfig> for DefaultPolicy {
 pub struct MonitoringConfig {
     pub conntrack_buffer_size: usize,
     pub process_cache_ttl_secs: u64,
+    #[serde(default = "default_cache_capacity")]
+    pub process_cache_capacity: usize,
     pub event_bus_capacity: usize,
+    #[serde(default = "default_conntrack_path")]
+    pub conntrack_binary_path: std::path::PathBuf,
+    #[serde(default = "default_conntrack_protocols")]
+    pub conntrack_protocols: Vec<String>,
+    #[serde(default)]
+    pub use_fake: bool,
+}
+
+fn default_cache_capacity() -> usize {
+    1024
+}
+
+fn default_conntrack_path() -> std::path::PathBuf {
+    std::path::PathBuf::from("/usr/sbin/conntrack")
+}
+
+fn default_conntrack_protocols() -> Vec<String> {
+    vec!["tcp".to_string(), "udp".to_string()]
 }
 
 /// Learning mode configuration (debounce, timeouts, overflow).
@@ -136,11 +176,19 @@ audit_flush_interval_secs = 2
 default_policy = "ask"
 rollback_timeout_secs = 30
 nftables_table_name = "syswall"
+nft_binary_path = "/usr/sbin/nft"
+nft_command_timeout_secs = 5
+nft_max_output_bytes = 1048576
+use_fake = true
 
 [monitoring]
 conntrack_buffer_size = 4096
 process_cache_ttl_secs = 5
+process_cache_capacity = 1024
 event_bus_capacity = 4096
+conntrack_binary_path = "/usr/sbin/conntrack"
+conntrack_protocols = ["tcp", "udp"]
+use_fake = true
 
 [learning]
 enabled = true

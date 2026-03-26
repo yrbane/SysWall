@@ -10,6 +10,8 @@ syswall-infra = { path = "../infra" }
 syswall-proto = { path = "../proto" }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
+tokio-stream = { workspace = true }
+futures = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }

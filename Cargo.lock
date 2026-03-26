@@ -1201,12 +1201,14 @@ name = "syswall-daemon"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "futures",
  "serde",
  "syswall-app",
  "syswall-domain",
  "syswall-infra",
  "syswall-proto",
  "tokio",
+ "tokio-stream",
  "tokio-util",
  "toml",
  "tonic",
