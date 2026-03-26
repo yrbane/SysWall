@@ -26,3 +26,4 @@ hyper-util = { workspace = true }
 tower = { workspace = true }
 http = { workspace = true }
 http-body = { workspace = true }
+sd-notify = "0.4"
