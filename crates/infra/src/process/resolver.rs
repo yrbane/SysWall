@@ -9,8 +9,10 @@ use syswall_domain::errors::DomainError;
 use syswall_domain::ports::ProcessResolver;
 use syswall_domain::value_objects::ExecutablePath;
 
+use syswall_domain::value_objects::Protocol;
+
 use super::cache::ProcessCache;
-use super::proc_parser::{parse_cmdline_opt, parse_proc_status};
+use super::proc_parser::{parse_cmdline_opt, parse_proc_net_tcp, parse_proc_net_tcp6, parse_proc_net_udp, parse_proc_status, ProcNetEntry};
 
 /// Configuration for the ProcfsProcessResolver.
 /// Configuration pour le ProcfsProcessResolver.
@@ -100,6 +102,62 @@ impl ProcfsProcessResolver {
         ))
     }
 
+    /// Find socket inode by matching a connection 5-tuple against /proc/net/tcp and /proc/net/udp.
+    /// Trouve l'inode de socket en comparant un 5-tuple de connexion avec /proc/net/tcp et /proc/net/udp.
+    fn find_inode_by_connection(
+        protocol: Protocol,
+        local_ip: std::net::IpAddr,
+        local_port: u16,
+        remote_ip: std::net::IpAddr,
+        remote_port: u16,
+    ) -> Option<u64> {
+        let entries = match protocol {
+            Protocol::Tcp => {
+                let mut entries = Vec::new();
+                if let Ok(content) = std::fs::read_to_string("/proc/net/tcp") {
+                    entries.extend(parse_proc_net_tcp(&content));
+                }
+                if let Ok(content) = std::fs::read_to_string("/proc/net/tcp6") {
+                    entries.extend(parse_proc_net_tcp6(&content));
+                }
+                entries
+            }
+            Protocol::Udp => {
+                let mut entries = Vec::new();
+                if let Ok(content) = std::fs::read_to_string("/proc/net/udp") {
+                    entries.extend(parse_proc_net_udp(&content));
+                }
+                // /proc/net/udp6 uses same format
+                if let Ok(content) = std::fs::read_to_string("/proc/net/udp6") {
+                    entries.extend(parse_proc_net_tcp6(&content)); // same parser
+                }
+                entries
+            }
+            _ => return None,
+        };
+
+        // Try exact match first (local+remote)
+        for entry in &entries {
+            if entry.local_ip == local_ip
+                && entry.local_port == local_port
+                && entry.remote_ip == remote_ip
+                && entry.remote_port == remote_port
+                && entry.inode != 0
+            {
+                return Some(entry.inode);
+            }
+        }
+
+        // Fallback: match by local port only (for listening sockets or when remote is 0.0.0.0)
+        for entry in &entries {
+            if entry.local_port == local_port && entry.inode != 0 {
+                return Some(entry.inode);
+            }
+        }
+
+        None
+    }
+
     /// Scan /proc/[0-9]*/fd/* to find which PID owns a socket inode.
     /// Parcourt /proc/[0-9]*/fd/* pour trouver quel PID possede un inode de socket.
     fn find_pid_by_inode(inode: u64) -> Option<u32> {
@@ -162,6 +220,35 @@ impl ProcessResolver for ProcfsProcessResolver {
         }
 
         Ok(result.map(|(info, _)| info))
+    }
+
+    /// Resolve process info by connection 5-tuple.
+    /// Resout les informations du processus par 5-tuple de connexion.
+    async fn resolve_by_connection(
+        &self,
+        protocol: Protocol,
+        local_ip: std::net::IpAddr,
+        local_port: u16,
+        remote_ip: std::net::IpAddr,
+        remote_port: u16,
+    ) -> Result<Option<ProcessInfo>, DomainError> {
+        // Find inode from /proc/net/tcp or /proc/net/udp
+        let inode = tokio::task::spawn_blocking(move || {
+            Self::find_inode_by_connection(protocol, local_ip, local_port, remote_ip, remote_port)
+        })
+        .await
+        .map_err(|e| DomainError::Infrastructure(format!("spawn_blocking failed: {}", e)))?;
+
+        match inode {
+            Some(inode) => self.resolve_by_socket(inode).await,
+            None => {
+                debug!(
+                    "No socket inode found for {}:{} -> {}:{} ({:?})",
+                    local_ip, local_port, remote_ip, remote_port, protocol
+                );
+                Ok(None)
+            }
+        }
     }
 
     /// Resolve process info by socket inode.

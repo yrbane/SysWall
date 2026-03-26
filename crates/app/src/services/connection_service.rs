@@ -39,10 +39,43 @@ impl ConnectionService {
         &self,
         mut connection: Connection,
     ) -> Result<Connection, DomainError> {
-        // Best-effort process enrichment
+        // Best-effort process enrichment via /proc/net lookup
+        // Enrichissement best-effort du processus via /proc/net
         if connection.process.is_none() {
-            // In a real implementation, we'd resolve via socket inode
-            // For now, process info is provided by the connection monitor
+            let local_ip = connection.source.ip;
+            let local_port = connection.source.port.value();
+            let remote_ip = connection.destination.ip;
+            let remote_port = connection.destination.port.value();
+
+            match self
+                .process_resolver
+                .resolve_by_connection(
+                    connection.protocol,
+                    local_ip,
+                    local_port,
+                    remote_ip,
+                    remote_port,
+                )
+                .await
+            {
+                Ok(Some(info)) => {
+                    tracing::debug!(
+                        "Resolved process for {}:{} -> {}:{}: {} (PID {})",
+                        local_ip, local_port, remote_ip, remote_port,
+                        info.name, info.pid
+                    );
+                    connection.process = Some(info);
+                }
+                Ok(None) => {
+                    tracing::trace!(
+                        "No process found for {}:{} -> {}:{}",
+                        local_ip, local_port, remote_ip, remote_port
+                    );
+                }
+                Err(e) => {
+                    tracing::debug!("Process resolution failed: {}", e);
+                }
+            }
         }
 
         // Load rules and evaluate
