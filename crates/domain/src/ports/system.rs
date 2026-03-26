@@ -35,4 +35,20 @@ pub trait ConnectionMonitor: Send + Sync {
 pub trait ProcessResolver: Send + Sync {
     async fn resolve(&self, pid: u32) -> Result<Option<ProcessInfo>, DomainError>;
     async fn resolve_by_socket(&self, inode: u64) -> Result<Option<ProcessInfo>, DomainError>;
+
+    /// Resolve process info by connection 5-tuple. Default returns None.
+    /// Not all resolvers support this -- only ProcfsProcessResolver implements it.
+    ///
+    /// Résout les informations du processus par 5-tuple de connexion.
+    /// Tous les résolveurs ne le supportent pas -- seul ProcfsProcessResolver l'implémente.
+    async fn resolve_by_connection(
+        &self,
+        _protocol: crate::value_objects::Protocol,
+        _local_ip: std::net::IpAddr,
+        _local_port: u16,
+        _remote_ip: std::net::IpAddr,
+        _remote_port: u16,
+    ) -> Result<Option<ProcessInfo>, DomainError> {
+        Ok(None)
+    }
 }
