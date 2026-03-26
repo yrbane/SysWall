@@ -74,21 +74,19 @@ fn set_socket_permissions(path: &PathBuf) {
         warn!("Failed to set socket permissions: {}", e);
     }
 
-    // Try to set group to syswall
+    // Try to set group to syswall (may fail in sandboxed systemd environments)
+    // Tente de changer le groupe à syswall (peut échouer dans un environnement systemd sandboxé)
     match nix::unistd::Group::from_name("syswall") {
         Ok(Some(group)) => {
             if let Err(e) = nix::unistd::chown(path, None, Some(group.gid)) {
-                warn!("Failed to set socket group to syswall: {}", e);
+                tracing::debug!("Could not set socket group to syswall (expected in sandboxed systemd): {}", e);
             }
         }
         Ok(None) => {
-            warn!(
-                "Group 'syswall' does not exist, socket will use default group. \
-                 Create the group for production use."
-            );
+            tracing::debug!("Group 'syswall' does not exist, socket uses default group");
         }
         Err(e) => {
-            warn!("Failed to look up syswall group: {}", e);
+            tracing::debug!("Failed to look up syswall group: {}", e);
         }
     }
 }
