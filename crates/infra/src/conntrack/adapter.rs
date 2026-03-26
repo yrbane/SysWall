@@ -72,7 +72,7 @@ fn detect_local_ips() -> Vec<IpAddr> {
         for addr in addrs {
             if let Some(sockaddr) = addr.address {
                 if let Some(sin) = sockaddr.as_sockaddr_in() {
-                    let ip = IpAddr::V4(std::net::Ipv4Addr::from(sin.ip()));
+                    let ip = IpAddr::V4(sin.ip());
                     if !ips.contains(&ip) {
                         ips.push(ip);
                     }
@@ -125,17 +125,16 @@ impl ConnectionMonitor for ConntrackMonitorAdapter {
                 loop {
                     match lines.next_line().await {
                         Ok(Some(line)) => {
-                            if let Some(event) = parse_conntrack_line(&line) {
-                                if let Some(conn) =
-                                    conntrack_to_connection(event, &local_ips)
-                                {
-                                    if tx.send(Ok(conn)).await.is_err() {
-                                        debug!(
-                                            "conntrack {} stream: receiver dropped",
-                                            proto_name
-                                        );
-                                        break;
-                                    }
+                            #[allow(clippy::collapsible_if)]
+                            if let Some(conn) = parse_conntrack_line(&line)
+                                .and_then(|event| conntrack_to_connection(event, &local_ips))
+                            {
+                                if tx.send(Ok(conn)).await.is_err() {
+                                    debug!(
+                                        "conntrack {} stream: receiver dropped",
+                                        proto_name
+                                    );
+                                    break;
                                 }
                             }
                         }
@@ -193,7 +192,7 @@ impl ConnectionMonitor for ConntrackMonitorAdapter {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let connections: Vec<Connection> = stdout
             .lines()
-            .filter_map(|line| parse_conntrack_line(line))
+            .filter_map(parse_conntrack_line)
             .filter_map(|event| conntrack_to_connection(event, &self.local_ips))
             .collect();
 

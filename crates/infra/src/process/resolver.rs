@@ -126,10 +126,11 @@ impl ProcfsProcessResolver {
             };
 
             for fd_entry in fd_entries.flatten() {
-                if let Ok(link) = std::fs::read_link(fd_entry.path()) {
-                    if link.to_string_lossy() == target {
-                        return name_str.parse().ok();
-                    }
+                if std::fs::read_link(fd_entry.path())
+                    .ok()
+                    .is_some_and(|link| link.to_string_lossy() == target)
+                {
+                    return name_str.parse().ok();
                 }
             }
         }

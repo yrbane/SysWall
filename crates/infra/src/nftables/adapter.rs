@@ -319,17 +319,19 @@ impl FirewallEngine for NftablesFirewallAdapter {
             std::collections::HashMap::new();
 
         for entry in &nft_rules {
-            if let Some(ref comment) = entry.comment {
-                if let Some(uuid) = extract_rule_id_from_comment(comment) {
-                    nft_rule_ids.insert(uuid);
-                    nft_handles
-                        .entry(uuid)
-                        .or_default()
-                        .push(NftRuleHandle {
-                            chain: entry.chain.clone(),
-                            handle: entry.handle,
-                        });
-                }
+            if let Some(uuid) = entry
+                .comment
+                .as_ref()
+                .and_then(|c| extract_rule_id_from_comment(c))
+            {
+                nft_rule_ids.insert(uuid);
+                nft_handles
+                    .entry(uuid)
+                    .or_default()
+                    .push(NftRuleHandle {
+                        chain: entry.chain.clone(),
+                        handle: entry.handle,
+                    });
             }
         }
 
@@ -387,19 +389,21 @@ impl FirewallEngine for NftablesFirewallAdapter {
 
         let mut new_handle_map = HandleMap::new();
         for entry in &final_rules {
-            if let Some(ref comment) = entry.comment {
-                if let Some(uuid) = extract_rule_id_from_comment(comment) {
-                    let rule_id = RuleId::from_uuid(uuid);
-                    let mut handles = new_handle_map
-                        .get(&rule_id)
-                        .cloned()
-                        .unwrap_or_default();
-                    handles.push(NftRuleHandle {
-                        chain: entry.chain.clone(),
-                        handle: entry.handle,
-                    });
-                    new_handle_map.insert(rule_id, handles);
-                }
+            if let Some(uuid) = entry
+                .comment
+                .as_ref()
+                .and_then(|c| extract_rule_id_from_comment(c))
+            {
+                let rule_id = RuleId::from_uuid(uuid);
+                let mut handles = new_handle_map
+                    .get(&rule_id)
+                    .cloned()
+                    .unwrap_or_default();
+                handles.push(NftRuleHandle {
+                    chain: entry.chain.clone(),
+                    handle: entry.handle,
+                });
+                new_handle_map.insert(rule_id, handles);
             }
         }
         *self.handle_map.lock().unwrap() = new_handle_map;

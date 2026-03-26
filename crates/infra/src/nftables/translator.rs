@@ -67,10 +67,12 @@ pub fn translate_rule(rule: &Rule) -> Option<TranslatedRule> {
     }
 
     // User match (meta skuid)
-    if let Some(ref username) = criteria.user {
-        if let Some(uid) = resolve_username_to_uid(username) {
-            expressions.extend(["meta".into(), "skuid".into(), uid.to_string()]);
-        }
+    if let Some(uid) = criteria
+        .user
+        .as_ref()
+        .and_then(|u| resolve_username_to_uid(u))
+    {
+        expressions.extend(["meta".into(), "skuid".into(), uid.to_string()]);
     }
 
     // Verdict
