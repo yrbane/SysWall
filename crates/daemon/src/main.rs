@@ -5,6 +5,7 @@ mod signals;
 mod supervisor;
 
 use std::path::Path;
+use std::time::Duration;
 
 use futures::StreamExt;
 use tokio_util::sync::CancellationToken;
@@ -15,6 +16,7 @@ use syswall_domain::entities::ConnectionVerdict;
 use syswall_domain::ports::RuleRepository;
 
 use crate::config::SysWallConfig;
+use crate::grpc::{SysWallControlService, SysWallEventService, start_grpc_server};
 use crate::supervisor::Supervisor;
 
 #[tokio::main]
@@ -128,6 +130,46 @@ async fn main() {
                 }
             }
 
+            Ok(())
+        }
+    });
+
+    // gRPC server task
+    supervisor.spawn("grpc-server", {
+        let control_service = SysWallControlService::new(
+            ctx.rule_service.clone(),
+            ctx.learning_service.clone(),
+            ctx.firewall.clone(),
+        );
+        let event_service = SysWallEventService::new(ctx.event_bus.clone());
+        let socket_path = config.daemon.socket_path.clone();
+        let cancel = cancel.clone();
+
+        async move {
+            start_grpc_server(socket_path, control_service, event_service, cancel).await
+        }
+    });
+
+    // Periodic decision expiration task
+    supervisor.spawn("decision-expiry", {
+        let learning_service = ctx.learning_service.clone();
+        let cancel = cancel.clone();
+
+        async move {
+            loop {
+                tokio::select! {
+                    _ = cancel.cancelled() => break,
+                    _ = tokio::time::sleep(Duration::from_secs(30)) => {
+                        match learning_service.expire_overdue().await {
+                            Ok(expired) if !expired.is_empty() => {
+                                info!("Expired {} overdue pending decisions", expired.len());
+                            }
+                            Err(e) => warn!("Decision expiry error: {}", e),
+                            _ => {}
+                        }
+                    }
+                }
+            }
             Ok(())
         }
     });
