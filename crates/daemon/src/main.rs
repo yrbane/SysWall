@@ -285,13 +285,13 @@ async fn main() {
     info!("SysWall daemon ready");
 
     // Notify systemd that we're ready
-    let _ = sd_notify::notify(true, &[sd_notify::NotifyState::Ready]);
+    let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Ready]);
 
     // Run until shutdown
     supervisor.run().await;
 
     // Notify systemd we're stopping
-    let _ = sd_notify::notify(true, &[sd_notify::NotifyState::Stopping]);
+    let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Stopping]);
 
     info!("SysWall daemon stopped");
 }
