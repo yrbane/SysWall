@@ -167,14 +167,69 @@ export const fr = {
   settings_version: 'Version',
   settings_uptime: 'Temps de fonctionnement',
 
+  // Settings - extra
+  settings_rollback_timeout: "Délai de rollback",
+  settings_conntrack_buffer: 'Tampon conntrack',
+  settings_process_cache_ttl: 'Cache processus TTL',
+  settings_event_bus_capacity: 'Capacité bus événements',
+  settings_debounce_window: 'Fenêtre de debounce',
+  settings_prompt_timeout: "Délai d'invite",
+  settings_about: 'À propos',
+  settings_monitoring: 'Surveillance',
+  settings_config_readonly: 'Configuration en lecture seule',
+
+  // Audit - extra
+  audit_export: 'Exporter',
+  audit_items_per_page: 'par page',
+  audit_from: 'De',
+  audit_to: 'À',
+  audit_filter_all: 'Tous',
+
+  // Dashboard - extra
+  dash_refresh: 'Rafraîchir',
+  dash_auto_refresh: 'Mise à jour automatique',
+  dash_pending: 'En attente',
+  dash_connections: 'connexions',
+
+  // Connections - extra
+  conn_live: 'Streaming en temps réel',
+  conn_count: 'connexions',
+  conn_details: 'Détails de la connexion',
+  conn_direction: 'Direction',
+  conn_source: 'Source',
+  conn_destination: 'Destination',
+
+  // Rules - extra
+  rules_enabled: 'Activée',
+  rules_disabled: 'Désactivée',
+  rules_status: 'Statut',
+  rules_actions: 'Actions',
+  rules_app_name: "Nom de l'application",
+  rules_app_path: "Chemin de l'application",
+  rules_ip_exact: 'IP exacte',
+  rules_ip_cidr: 'CIDR',
+  rules_port_exact: 'Port exact',
+  rules_port_range_start: 'Début de plage',
+  rules_port_range_end: 'Fin de plage',
+
+  // Learning - extra
+  learn_recent_decisions: 'Décisions récentes',
+  learn_no_history: 'Aucun historique',
+  learn_decision_history: 'Historique des décisions',
+
   // Common
   common_loading: 'Chargement...',
   common_error: 'Une erreur est survenue',
   common_retry: 'Réessayer',
   common_empty: 'Aucune donnée',
   common_seconds: 'secondes',
+  common_minutes: 'minutes',
+  common_hours: 'heures',
+  common_days: 'jours',
   common_connection_error:
     'Impossible de se connecter au daemon SysWall. Vérifiez que le service est actif.',
+  common_confirm: 'Confirmer',
+  common_of: 'sur',
 } as const;
 
 export type I18nKey = keyof typeof fr;
