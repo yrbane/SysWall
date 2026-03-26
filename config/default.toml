@@ -1,0 +1,36 @@
+config_version = 1
+
+[daemon]
+socket_path = "/var/run/syswall/syswall.sock"
+log_level = "info"
+log_dir = "/var/log/syswall"
+watchdog_interval_secs = 15
+
+[database]
+path = "/var/lib/syswall/syswall.db"
+journal_retention_days = 30
+audit_batch_size = 100
+audit_flush_interval_secs = 2
+
+[firewall]
+default_policy = "ask"
+rollback_timeout_secs = 30
+nftables_table_name = "syswall"
+
+[monitoring]
+conntrack_buffer_size = 4096
+process_cache_ttl_secs = 5
+event_bus_capacity = 4096
+
+[learning]
+enabled = true
+debounce_window_secs = 5
+prompt_timeout_secs = 60
+default_timeout_action = "block"
+max_pending_decisions = 50
+overflow_action = "block"
+
+[ui]
+locale = "fr"
+theme = "dark"
+refresh_interval_ms = 1000
