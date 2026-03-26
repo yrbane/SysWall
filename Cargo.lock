@@ -1190,6 +1190,7 @@ dependencies = [
  "chrono",
  "futures",
  "serde",
+ "serde_json",
  "syswall-domain",
  "tokio",
  "tracing",
