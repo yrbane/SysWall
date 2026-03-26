@@ -10,9 +10,16 @@ async-trait = { workspace = true }
 rusqlite = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+tokio-stream = { workspace = true }
+futures = { workspace = true }
 tracing = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
+lru = { workspace = true }
+nix = { workspace = true }
+
+[features]
+integration = []
 
 [dev-dependencies]
 tokio = { workspace = true }
