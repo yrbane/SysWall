@@ -6,6 +6,7 @@ members = [
     "crates/infra",
     "crates/proto",
     "crates/daemon",
+    "crates/ui/src-tauri",
 ]
 
 [workspace.package]
