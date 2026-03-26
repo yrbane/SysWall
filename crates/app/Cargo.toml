@@ -1,0 +1,15 @@
+[package]
+name = "syswall-app"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+syswall-domain = { path = "../domain" }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
