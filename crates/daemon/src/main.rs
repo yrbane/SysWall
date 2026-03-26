@@ -264,6 +264,24 @@ async fn main() {
         }
     });
 
+    // Systemd watchdog heartbeat
+    supervisor.spawn("systemd-watchdog", {
+        let cancel = cancel.clone();
+        async move {
+            // WatchdogSec=30s in the unit file, ping every 15s (half the interval)
+            let interval = Duration::from_secs(15);
+            loop {
+                tokio::select! {
+                    _ = cancel.cancelled() => break,
+                    _ = tokio::time::sleep(interval) => {
+                        let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Watchdog]);
+                    }
+                }
+            }
+            Ok(())
+        }
+    });
+
     info!("SysWall daemon ready");
 
     // Notify systemd that we're ready
