@@ -14,10 +14,25 @@
 
   let { decision, onrespond, responding = false }: Props = $props();
 
-  // Parse the snapshot from JSON
+  // Parse and normalize the snapshot from JSON
   const snapshot: ConnectionSnapshot | null = $derived.by(() => {
     try {
-      return JSON.parse(decision.snapshot_json);
+      const raw = JSON.parse(decision.snapshot_json);
+      return {
+        protocol: typeof raw.protocol === 'string' ? raw.protocol : Object.keys(raw.protocol || {})[0] || 'Unknown',
+        source: {
+          ip: raw.source?.ip || '',
+          port: typeof raw.source?.port === 'number' ? raw.source.port : raw.source?.port?.['0'] ?? 0,
+        },
+        destination: {
+          ip: raw.destination?.ip || '',
+          port: typeof raw.destination?.port === 'number' ? raw.destination.port : raw.destination?.port?.['0'] ?? 0,
+        },
+        direction: typeof raw.direction === 'string' ? raw.direction : Object.keys(raw.direction || {})[0] || 'Outbound',
+        process_name: raw.process_name || undefined,
+        process_path: raw.process_path?.['0'] || raw.process_path || undefined,
+        user: raw.user || undefined,
+      } as ConnectionSnapshot;
     } catch {
       return null;
     }

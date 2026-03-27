@@ -4,6 +4,34 @@ import { writable, derived } from 'svelte/store';
 import { listen } from '@tauri-apps/api/event';
 import type { ConnectionEvent, DomainEventPayload } from '$lib/types';
 
+// Flatten a raw Rust-serialized Connection into our flat ConnectionEvent format
+function flattenConnection(raw: any): ConnectionEvent {
+  return {
+    id: raw.id?.['0'] || raw.id || '',
+    protocol: typeof raw.protocol === 'string' ? raw.protocol : raw.protocol?.Tcp ? 'Tcp' : raw.protocol?.Udp ? 'Udp' : 'Other',
+    source: {
+      ip: raw.source?.ip || '',
+      port: typeof raw.source?.port === 'number' ? raw.source.port : raw.source?.port?.['0'] ?? raw.source?.port ?? 0,
+    },
+    destination: {
+      ip: raw.destination?.ip || '',
+      port: typeof raw.destination?.port === 'number' ? raw.destination.port : raw.destination?.port?.['0'] ?? raw.destination?.port ?? 0,
+    },
+    direction: typeof raw.direction === 'string' ? raw.direction : Object.keys(raw.direction || {})[0] || 'Outbound',
+    state: typeof raw.state === 'string' ? raw.state : Object.keys(raw.state || {})[0] || 'New',
+    process_name: raw.process?.name || raw.process_name || undefined,
+    process_path: raw.process?.path?.['0'] || raw.process?.path || raw.process_path || undefined,
+    pid: raw.process?.pid || raw.pid || undefined,
+    user: raw.user?.name || raw.user || undefined,
+    icon: raw.process?.icon || undefined,
+    bytes_sent: raw.bytes_sent || 0,
+    bytes_received: raw.bytes_received || 0,
+    started_at: raw.started_at || new Date().toISOString(),
+    verdict: typeof raw.verdict === 'string' ? raw.verdict : Object.keys(raw.verdict || {})[0] || 'Unknown',
+    matched_rule: raw.matched_rule?.['0'] || raw.matched_rule || undefined,
+  };
+}
+
 // Connection map keyed by ID
 export const connections = writable<Map<string, ConnectionEvent>>(new Map());
 
@@ -87,7 +115,8 @@ export function initConnectionListeners(): () => void {
 
   listen<DomainEventPayload>('syswall://connection-detected', (event) => {
     try {
-      const conn: ConnectionEvent = JSON.parse(event.payload.payload_json);
+      const raw = JSON.parse(event.payload.payload_json);
+      const conn = flattenConnection(raw);
       connections.update((map) => {
         map.set(conn.id, conn);
         return new Map(map);

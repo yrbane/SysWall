@@ -86,6 +86,7 @@ export interface ConnectionEvent {
   process_path?: string;
   pid?: number;
   user?: string;
+  icon?: string;
   bytes_sent: number;
   bytes_received: number;
   started_at: string;
