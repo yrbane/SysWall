@@ -138,11 +138,23 @@ impl ProcfsProcessResolver {
         let mut table = std::collections::HashMap::new();
 
         // Run TCP and UDP separately to get consistent column format
-        for args in &[&["-tnp", "state", "all"][..], &["-unp", "state", "all"][..]] {
-            let output = std::process::Command::new("ss")
+        for args in &[&["-tnp"][..], &["-unp"][..]] {
+            let output = match std::process::Command::new("/usr/bin/ss")
                 .args(*args)
                 .output()
-                .ok()?;
+            {
+                Ok(o) => o,
+                Err(e) => {
+                    tracing::error!("Failed to execute ss {:?}: {}", args, e);
+                    continue;
+                }
+            };
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                tracing::error!("ss {:?} failed (exit {}): {}", args, output.status, stderr);
+                continue;
+            }
 
             let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -378,7 +390,7 @@ impl ProcessResolver for ProcfsProcessResolver {
                     cache.table = table;
                     cache.last_refresh = std::time::Instant::now();
                 }
-                debug!("Socket table refreshed: {} entries", count);
+                tracing::info!("Socket table refreshed: {} entries", count);
             }
         }
 
