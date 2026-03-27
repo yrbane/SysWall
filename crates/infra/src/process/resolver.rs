@@ -105,6 +105,24 @@ impl ProcfsProcessResolver {
         ))
     }
 
+    /// Parse ss output to extract PID.
+    /// Example line: `ESTAB 0 0 192.168.1.159:443 8.8.8.8:12345 users:(("firefox",pid=1234,fd=22))`
+    fn parse_ss_output(output: &str) -> Option<u32> {
+        for line in output.lines().skip(1) {
+            // Look for pid=NNNN in the line
+            if let Some(pid_start) = line.find("pid=") {
+                let after_pid = &line[pid_start + 4..];
+                let pid_str: String = after_pid.chars().take_while(|c| c.is_ascii_digit()).collect();
+                if let Ok(pid) = pid_str.parse::<u32>() {
+                    if pid > 0 {
+                        return Some(pid);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Find socket inode by matching a connection 5-tuple against /proc/net/tcp and /proc/net/udp.
     /// Trouve l'inode de socket en comparant un 5-tuple de connexion avec /proc/net/tcp et /proc/net/udp.
     fn find_inode_by_connection(
@@ -231,8 +249,11 @@ impl ProcessResolver for ProcfsProcessResolver {
         Ok(None)
     }
 
-    /// Resolve process info by connection 5-tuple.
-    /// Resout les informations du processus par 5-tuple de connexion.
+    /// Resolve process info by connection 5-tuple using `ss -tnp` / `ss -unp`.
+    /// Uses the ss (socket statistics) command which queries the kernel via INET_DIAG
+    /// netlink and returns process info directly — much more reliable than /proc/net parsing.
+    ///
+    /// Résout les informations du processus par 5-tuple via `ss`.
     async fn resolve_by_connection(
         &self,
         protocol: Protocol,
@@ -241,24 +262,51 @@ impl ProcessResolver for ProcfsProcessResolver {
         remote_ip: std::net::IpAddr,
         remote_port: u16,
     ) -> Result<Option<ProcessInfo>, DomainError> {
-        // Find inode from /proc/net/tcp or /proc/net/udp
-        let inode = tokio::task::spawn_blocking(move || {
-            Self::find_inode_by_connection(protocol, local_ip, local_port, remote_ip, remote_port)
+        // Check cache by a synthetic key: "proto:local:port:remote:port"
+        let cache_key = format!("{}:{}:{}:{}:{}",
+            match protocol { Protocol::Tcp => "tcp", Protocol::Udp => "udp", _ => "other" },
+            local_ip, local_port, remote_ip, remote_port);
+
+        // Try to find PID via ss command
+        let proto_flag = match protocol {
+            Protocol::Tcp => "-t",
+            Protocol::Udp => "-u",
+            _ => return Ok(None),
+        };
+
+        let filter = format!("sport = :{} and dport = :{}", local_port, remote_port);
+
+        let result = tokio::task::spawn_blocking(move || {
+            let output = std::process::Command::new("ss")
+                .args([proto_flag, "-np", "state", "all", &filter])
+                .output();
+
+            match output {
+                Ok(out) => {
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    Self::parse_ss_output(&stdout)
+                }
+                Err(e) => {
+                    debug!("ss command failed: {}", e);
+                    None
+                }
+            }
         })
         .await
         .map_err(|e| DomainError::Infrastructure(format!("spawn_blocking failed: {}", e)))?;
 
-        match inode {
-            Some(inode) => self.resolve_by_socket(inode).await,
+        match result {
+            Some(pid) => self.resolve(pid).await,
             None => {
                 debug!(
-                    "No socket inode found for {}:{} -> {}:{} ({:?})",
+                    "No process found via ss for {}:{} -> {}:{} ({:?})",
                     local_ip, local_port, remote_ip, remote_port, protocol
                 );
                 Ok(None)
             }
         }
     }
+
 
     /// Resolve process info by socket inode.
     /// Resout les informations du processus par inode de socket.
