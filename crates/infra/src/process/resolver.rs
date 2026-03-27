@@ -394,7 +394,7 @@ impl ProcessResolver for ProcfsProcessResolver {
             }
         }
 
-        // Look up PID from socket table
+        // 1. Try pre-indexed socket table first (fast, covers long-lived connections)
         let pid = self
             .socket_table
             .lock()
@@ -405,30 +405,33 @@ impl ProcessResolver for ProcfsProcessResolver {
             return self.resolve(pid).await;
         }
 
-        // Fallback: direct ss query for this specific port (handles new/ephemeral connections)
-        let proto_flag = match protocol {
-            Protocol::Tcp => "-tnp",
-            Protocol::Udp => "-unp",
-            _ => return Ok(None),
-        };
-
+        // 2. Fallback: read /proc/net/tcp directly for this exact 5-tuple
+        //    This catches ephemeral connections that ss misses
         let result = tokio::task::spawn_blocking(move || {
-            let output = std::process::Command::new("/usr/bin/ss")
-                .args([proto_flag, "sport", &format!("= :{}", local_port)])
-                .output()
-                .ok()?;
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            Self::parse_ss_pid(&stdout)
+            Self::find_inode_by_connection(protocol, local_ip, local_port, remote_ip, remote_port)
+                .and_then(Self::find_pid_by_inode)
         })
         .await
         .map_err(|e| DomainError::Infrastructure(format!("spawn_blocking failed: {}", e)))?;
 
-        match result {
+        if let Some(pid) = result {
+            return self.resolve(pid).await;
+        }
+
+        // 3. Last resort: try to match by destination port (for server-side connections)
+        //    E.g., if something connects to localhost:8005, find who listens on 8005
+        let listen_pid = self
+            .socket_table
+            .lock()
+            .ok()
+            .and_then(|cache| cache.table.get(&remote_port).copied());
+
+        match listen_pid {
             Some(pid) => self.resolve(pid).await,
             None => {
                 debug!(
-                    "No process found for port {} ({}:{} -> {}:{} {:?})",
-                    local_port, local_ip, local_port, remote_ip, remote_port, protocol
+                    "No process found for {}:{} -> {}:{} {:?}",
+                    local_ip, local_port, remote_ip, remote_port, protocol
                 );
                 Ok(None)
             }
