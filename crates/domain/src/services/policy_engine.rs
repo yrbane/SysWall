@@ -260,6 +260,7 @@ mod tests {
             started_at: Utc::now(),
             verdict: ConnectionVerdict::Unknown,
             matched_rule: None,
+            remote_hostname: None,
         }
     }
 

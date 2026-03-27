@@ -57,6 +57,7 @@ mod tests {
             started_at: Utc::now(),
             verdict: ConnectionVerdict::Unknown,
             matched_rule: None,
+            remote_hostname: None,
         }
     }
 
@@ -92,11 +93,13 @@ mod tests {
             .await
             .unwrap();
 
+        let dns_resolver = Arc::new(FakeDnsResolver::new());
         let connection_service = ConnectionService::new(
             process_resolver,
             rule_repo,
             event_bus,
             DefaultPolicy::Block,
+            dns_resolver,
         );
 
         // Simulate a connection event
@@ -116,11 +119,13 @@ mod tests {
         let event_bus = Arc::new(FakeEventBus::new());
         let process_resolver = Arc::new(FakeProcessResolver::new());
 
+        let dns_resolver = Arc::new(FakeDnsResolver::new());
         let connection_service = ConnectionService::new(
             process_resolver,
             rule_repo,
             event_bus,
             DefaultPolicy::Ask,
+            dns_resolver,
         );
 
         let conn = make_connection(Protocol::Tcp, "93.184.216.34", 443, Direction::Outbound);
@@ -148,11 +153,13 @@ mod tests {
             .await
             .unwrap();
 
+        let dns_resolver = Arc::new(FakeDnsResolver::new());
         let connection_service = ConnectionService::new(
             process_resolver,
             rule_repo,
             event_bus,
             DefaultPolicy::Block,
+            dns_resolver,
         );
 
         // DNS query should be allowed by whitelist
@@ -204,11 +211,13 @@ mod tests {
             .await
             .unwrap();
 
+        let dns_resolver = Arc::new(FakeDnsResolver::new());
         let connection_service = ConnectionService::new(
             process_resolver,
             rule_repo,
             event_bus.clone(),
             DefaultPolicy::Block,
+            dns_resolver,
         );
 
         let learning_service = LearningService::new(

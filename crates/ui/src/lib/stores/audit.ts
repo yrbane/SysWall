@@ -52,6 +52,73 @@ export const paginatedAuditEvents = derived(
   }
 );
 
+// Build a human-readable description from a domain event payload
+function buildDescription(eventType: string, payload: any): string {
+  // Use explicit message/description if available
+  if (payload.message && typeof payload.message === 'string') return payload.message;
+  if (payload.description && typeof payload.description === 'string') return payload.description;
+
+  const app = payload.process?.name || payload.process_name || '';
+  const dstIp = payload.destination?.ip || '';
+  const dstPort = payload.destination?.port || '';
+  const dst = dstIp ? `${dstIp}${dstPort ? ':' + dstPort : ''}` : '';
+  const proto = typeof payload.protocol === 'string' ? payload.protocol.toUpperCase() : '';
+  const ruleId = payload.rule_id || payload.matched_rule || '';
+  const verdict = payload.verdict || '';
+  const connId = payload.connection_id || payload.id || '';
+
+  switch (eventType) {
+    case 'connection_detected':
+      return `Connexion ${proto || ''} ${app ? 'de ' + app + ' ' : ''}vers ${dst || 'inconnu'}`.trim();
+    case 'connection_updated':
+      return `Connexion mise à jour${connId ? ' (' + connId.slice(0, 8) + ')' : ''}${payload.state ? ' — ' + payload.state : ''}`;
+    case 'connection_closed':
+      return `Connexion fermée${connId ? ' (' + (typeof connId === 'string' ? connId.slice(0, 8) : '') + ')' : ''}`;
+    case 'rule_created':
+      return `Règle créée : ${payload.name || ruleId || 'sans nom'}`;
+    case 'rule_updated':
+      return `Règle modifiée : ${payload.name || ruleId || 'sans nom'}`;
+    case 'rule_deleted':
+      return `Règle supprimée : ${payload.name || ruleId || 'sans nom'}`;
+    case 'rule_matched':
+      return `Règle ${ruleId ? ruleId.slice(0, 8) : '?'} appliquée${verdict ? ' — ' + verdict : ''}${connId ? ' (conn ' + connId.slice(0, 8) + ')' : ''}`;
+    case 'decision_required':
+      return `Décision requise${app ? ' pour ' + app : ''}${dst ? ' vers ' + dst : ''}`;
+    case 'decision_resolved':
+      return `Décision prise${payload.action ? ' : ' + payload.action : ''}${app ? ' pour ' + app : ''}`;
+    case 'decision_expired':
+      return `Décision expirée${connId ? ' (' + (typeof connId === 'string' ? connId.slice(0, 8) : '') + ')' : ''}`;
+    case 'firewall_status_changed':
+      return `État du pare-feu modifié${payload.enabled !== undefined ? ' — ' + (payload.enabled ? 'activé' : 'désactivé') : ''}`;
+    case 'system_error':
+      return `Erreur système${payload.error ? ' : ' + payload.error : ''}`;
+    default:
+      return eventType.replace(/_/g, ' ');
+  }
+}
+
+// Extract clean metadata: flatten objects, skip nested objects/arrays, keep only simple key=value pairs
+function cleanMetadata(payload: any): Record<string, string> {
+  if (typeof payload !== 'object' || payload === null) return {};
+  const result: Record<string, string> = {};
+  for (const [key, val] of Object.entries(payload)) {
+    if (val === null || val === undefined) continue;
+    if (typeof val === 'object') {
+      // Flatten one level of nested simple values
+      if (!Array.isArray(val)) {
+        for (const [subKey, subVal] of Object.entries(val as Record<string, unknown>)) {
+          if (subVal !== null && subVal !== undefined && typeof subVal !== 'object') {
+            result[`${key}.${subKey}`] = String(subVal);
+          }
+        }
+      }
+      continue;
+    }
+    result[key] = String(val);
+  }
+  return result;
+}
+
 function eventToAudit(eventType: string, payloadJson: string, timestamp: string): AuditEvent | null {
   try {
     const payload = JSON.parse(payloadJson);
@@ -85,8 +152,7 @@ function eventToAudit(eventType: string, payloadJson: string, timestamp: string)
       system_error: payload.severity || 'error',
     };
 
-    const description =
-      payload.message || payload.description || `${eventType}: ${payloadJson.slice(0, 100)}`;
+    const description = buildDescription(eventType, payload);
 
     return {
       id: crypto.randomUUID(),
@@ -94,7 +160,7 @@ function eventToAudit(eventType: string, payloadJson: string, timestamp: string)
       severity: severityMap[eventType] || 'info',
       category: categoryMap[eventType] || 'system',
       description,
-      metadata: typeof payload === 'object' && payload !== null ? payload : {},
+      metadata: cleanMetadata(payload),
     };
   } catch {
     return null;

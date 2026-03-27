@@ -4,6 +4,7 @@
   import Button from '$lib/components/ui/Button.svelte';
   import Card from '$lib/components/ui/Card.svelte';
   import type { PendingDecisionMessage, ConnectionSnapshot, DecisionAction } from '$lib/types';
+  import { convertFileSrc } from '@tauri-apps/api/core';
   import { onMount, onDestroy } from 'svelte';
 
   interface Props {
@@ -32,6 +33,7 @@
         process_name: raw.process_name || undefined,
         process_path: raw.process_path?.['0'] || raw.process_path || undefined,
         user: raw.user || undefined,
+        icon: raw.process?.icon || raw.icon || undefined,
       } as ConnectionSnapshot;
     } catch {
       return null;
@@ -76,6 +78,22 @@
     return m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : `${s}s`;
   }
 
+  // Resolve app icon path to displayable URL
+  const iconSrc = $derived.by(() => {
+    if (!snapshot?.icon) return null;
+    try {
+      return convertFileSrc(snapshot.icon);
+    } catch {
+      return null;
+    }
+  });
+
+  let iconBroken = $state(false);
+
+  function handleIconError() {
+    iconBroken = true;
+  }
+
   function handleAction(action: DecisionAction) {
     // Default granularity: app_and_destination for persistent actions, app_only for one-time
     let granularity = 'app_and_destination';
@@ -110,11 +128,22 @@
     <div class="connection-info">
       <div class="app-header">
         <div class="app-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="1.5">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-            <line x1="8" y1="21" x2="16" y2="21" />
-            <line x1="12" y1="17" x2="12" y2="21" />
-          </svg>
+          {#if iconSrc && !iconBroken}
+            <img
+              src={iconSrc}
+              alt=""
+              width="32"
+              height="32"
+              class="app-icon-img"
+              onerror={handleIconError}
+            />
+          {:else}
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="1.5">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+          {/if}
         </div>
         <div class="app-details">
           <span class="app-name">{snapshot.process_name || fr.conn_unknown}</span>
@@ -130,8 +159,12 @@
           <span class="detail-value">{snapshot.user || '--'}</span>
         </div>
         <div class="detail-item">
+          <span class="detail-label">{fr.conn_source}</span>
+          <span class="detail-value font-mono">{snapshot.source?.ip || '--'}:{snapshot.source?.port || '--'}</span>
+        </div>
+        <div class="detail-item">
           <span class="detail-label">{fr.learn_destination}</span>
-          <span class="detail-value font-mono">{snapshot.destination?.ip}:{snapshot.destination?.port}</span>
+          <span class="detail-value font-mono">{snapshot.destination?.ip || '--'}:{snapshot.destination?.port || '--'}</span>
         </div>
         <div class="detail-item">
           <span class="detail-label">{fr.conn_protocol}</span>
@@ -253,6 +286,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .app-icon-img {
+    border-radius: var(--radius-sm);
+    object-fit: contain;
   }
 
   .app-details {

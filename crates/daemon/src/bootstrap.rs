@@ -15,6 +15,7 @@ use syswall_app::services::rule_service::RuleService;
 use syswall_domain::errors::DomainError;
 use syswall_domain::ports::{ConnectionMonitor, FirewallEngine, ProcessResolver};
 use syswall_infra::conntrack::{ConntrackConfig, ConntrackMonitorAdapter};
+use syswall_infra::dns::DnsResolver as InfraDnsResolver;
 use syswall_infra::event_bus::TokioBroadcastEventBus;
 use syswall_infra::nftables::{NftablesConfig, NftablesFirewallAdapter};
 use syswall_infra::persistence::audit_repository::SqliteAuditRepository;
@@ -106,6 +107,13 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, DomainError> {
 
     let notifier = Arc::new(FakeUserNotifier::new());
 
+    // DNS resolver (LRU cache, capacity 4096, TTL 300s)
+    // Résolveur DNS (cache LRU, capacité 4096, TTL 300s)
+    let dns_resolver = Arc::new(InfraDnsResolver::new(
+        config.monitoring.dns_cache_capacity,
+        config.monitoring.dns_cache_ttl_secs,
+    ));
+
     // Application services
     let rule_service = Arc::new(RuleService::new(
         rule_repo.clone(),
@@ -120,6 +128,7 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, DomainError> {
         rule_repo.clone(),
         event_bus.clone(),
         default_policy,
+        dns_resolver,
     ));
 
     let learning_service = Arc::new(LearningService::new(

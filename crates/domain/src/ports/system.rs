@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use futures::Stream;
+use std::net::IpAddr;
 use std::pin::Pin;
 
 use crate::entities::{Connection, ProcessInfo, Rule, RuleId};
@@ -27,6 +28,15 @@ pub trait FirewallEngine: Send + Sync {
 pub trait ConnectionMonitor: Send + Sync {
     async fn stream_events(&self) -> Result<ConnectionEventStream, DomainError>;
     async fn get_active_connections(&self) -> Result<Vec<Connection>, DomainError>;
+}
+
+/// Performs reverse DNS resolution for IP addresses.
+/// Effectue la résolution DNS inverse pour les adresses IP.
+#[async_trait]
+pub trait DnsResolver: Send + Sync {
+    /// Resolve the hostname for the given IP address, returning None on failure.
+    /// Résout le nom d'hôte pour l'adresse IP donnée, retourne None en cas d'échec.
+    async fn resolve(&self, ip: IpAddr) -> Result<Option<String>, DomainError>;
 }
 
 /// Resolves process information from PIDs or socket inodes.

@@ -68,6 +68,7 @@ mod tests {
             process_name: Some("curl".to_string()),
             process_path: None,
             user: Some("seb".to_string()),
+            hostname: None,
         }
     }
 

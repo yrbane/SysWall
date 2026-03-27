@@ -16,6 +16,7 @@ tracing = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 lru = { workspace = true }
+dns-lookup = { workspace = true }
 nix = { workspace = true }
 dirs = "6"
 

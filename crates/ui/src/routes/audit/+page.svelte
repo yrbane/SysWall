@@ -73,6 +73,42 @@
     return map[cat] || cat;
   }
 
+  // Expanded row for metadata details
+  let expandedEventId = $state<string | null>(null);
+
+  function toggleEventExpand(id: string) {
+    expandedEventId = expandedEventId === id ? null : id;
+  }
+
+  // Format description: if it looks like raw JSON, try to extract a readable string
+  function formatDescription(desc: string): string {
+    if (!desc) return '--';
+    // If the description starts with { or [, it's likely raw JSON — try to make it readable
+    const trimmed = desc.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        // Try to extract meaningful fields
+        const parts: string[] = [];
+        if (parsed.process_name) parts.push(parsed.process_name);
+        if (parsed.destination?.ip) parts.push(`vers ${parsed.destination.ip}${parsed.destination?.port ? ':' + parsed.destination.port : ''}`);
+        if (parsed.protocol) parts.push(typeof parsed.protocol === 'string' ? parsed.protocol.toUpperCase() : '');
+        if (parsed.verdict) parts.push(parsed.verdict);
+        if (parsed.message) parts.push(parsed.message);
+        if (parts.length > 0) return parts.filter(Boolean).join(' - ');
+      } catch {
+        // Not valid JSON — just use as-is
+      }
+    }
+    return desc;
+  }
+
+  // Check if metadata has entries worth displaying
+  function hasMetadata(metadata: Record<string, string> | undefined): boolean {
+    if (!metadata) return false;
+    return Object.keys(metadata).length > 0;
+  }
+
   function goPage(delta: number) {
     auditPage.update((p) => {
       const next = p + delta;
@@ -146,10 +182,18 @@
       <div class="col col-severity">{fr.audit_severity}</div>
       <div class="col col-category">{fr.audit_category}</div>
       <div class="col col-description">{fr.audit_description}</div>
+      <div class="col col-metadata">{fr.audit_metadata}</div>
     </div>
     <div class="table-body">
       {#each $paginatedAuditEvents as event (event.id)}
-        <div class="table-row">
+        <div
+          class="table-row"
+          class:expanded={expandedEventId === event.id}
+          onclick={() => hasMetadata(event.metadata) && toggleEventExpand(event.id)}
+          role={hasMetadata(event.metadata) ? 'button' : undefined}
+          tabindex={hasMetadata(event.metadata) ? 0 : undefined}
+          onkeydown={(e) => e.key === 'Enter' && hasMetadata(event.metadata) && toggleEventExpand(event.id)}
+        >
           <div class="col col-timestamp font-mono">
             {new Date(event.timestamp).toLocaleString('fr-FR')}
           </div>
@@ -159,10 +203,32 @@
           <div class="col col-category">
             <Badge variant={categoryVariant(event.category)} label={categoryLabel(event.category)} />
           </div>
-          <div class="col col-description truncate" title={event.description}>
-            {event.description}
+          <div class="col col-description truncate" title={formatDescription(event.description)}>
+            {formatDescription(event.description)}
+          </div>
+          <div class="col col-metadata">
+            {#if hasMetadata(event.metadata)}
+              <span class="metadata-count text-xs text-secondary font-mono">
+                {Object.keys(event.metadata).length}
+              </span>
+            {:else}
+              <span class="text-tertiary">--</span>
+            {/if}
           </div>
         </div>
+        <!-- Expanded metadata panel -->
+        {#if expandedEventId === event.id && hasMetadata(event.metadata)}
+          <div class="metadata-panel">
+            <div class="metadata-badges">
+              {#each Object.entries(event.metadata) as [key, value]}
+                <span class="metadata-badge" title="{key}={value}">
+                  <span class="metadata-key">{key}</span>
+                  <span class="metadata-val">{value}</span>
+                </span>
+              {/each}
+            </div>
+          </div>
+        {/if}
       {/each}
     </div>
   </div>
@@ -312,6 +378,71 @@
   .col-description {
     flex: 1;
     min-width: 0;
+  }
+
+  .col-metadata {
+    width: 80px;
+    flex-shrink: 0;
+    text-align: center;
+  }
+
+  .metadata-count {
+    cursor: pointer;
+  }
+
+  .table-row.expanded {
+    background: var(--bg-hover);
+    border-bottom-color: var(--accent-cyan);
+  }
+
+  .table-row[role='button'] {
+    cursor: pointer;
+  }
+
+  .metadata-panel {
+    padding: var(--space-3) var(--space-4);
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-primary);
+    animation: slideDown 200ms ease;
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; max-height: 0; }
+    to { opacity: 1; max-height: 300px; }
+  }
+
+  .metadata-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .metadata-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: var(--font-size-xs);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--border-primary);
+  }
+
+  .metadata-key {
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-semibold);
+    font-family: var(--font-mono);
+  }
+
+  .metadata-val {
+    padding: 2px 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* Pagination */

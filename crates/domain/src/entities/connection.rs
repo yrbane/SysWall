@@ -83,6 +83,9 @@ pub struct ConnectionSnapshot {
     pub process_name: Option<String>,
     pub process_path: Option<ExecutablePath>,
     pub user: Option<String>,
+    /// Resolved hostname for the remote IP address, if available.
+    /// Nom d'hôte résolu pour l'adresse IP distante, si disponible.
+    pub hostname: Option<String>,
 }
 
 /// A network connection observed by the system.
@@ -102,6 +105,9 @@ pub struct Connection {
     pub started_at: DateTime<Utc>,
     pub verdict: ConnectionVerdict,
     pub matched_rule: Option<super::rule::RuleId>,
+    /// Resolved hostname for the remote IP address, if available.
+    /// Nom d'hôte résolu pour l'adresse IP distante, si disponible.
+    pub remote_hostname: Option<String>,
 }
 
 impl Connection {
@@ -116,6 +122,7 @@ impl Connection {
             process_name: self.process.as_ref().map(|p| p.name.clone()),
             process_path: self.process.as_ref().and_then(|p| p.path.clone()),
             user: self.user.as_ref().map(|u| u.name.clone()),
+            hostname: self.remote_hostname.clone(),
         }
     }
 }
@@ -155,6 +162,7 @@ mod tests {
             started_at: Utc::now(),
             verdict: ConnectionVerdict::Unknown,
             matched_rule: None,
+            remote_hostname: None,
         }
     }
 

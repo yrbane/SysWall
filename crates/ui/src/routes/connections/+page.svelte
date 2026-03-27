@@ -5,10 +5,12 @@
   import Card from '$lib/components/ui/Card.svelte';
   import EmptyState from '$lib/components/ui/EmptyState.svelte';
   import Input from '$lib/components/ui/Input.svelte';
+  import { convertFileSrc } from '@tauri-apps/api/core';
   import {
     filteredConnections,
     connectionFilters,
     connectionCounts,
+    connectionList,
   } from '$lib/stores/connections';
   import type { ConnectionEvent } from '$lib/types';
 
@@ -24,6 +26,17 @@
   let protocolFilter = $state('');
   let verdictFilter = $state('');
   let directionFilter = $state('');
+  let applicationFilter = $state('');
+  let portFilter = $state('');
+
+  // Unique application names derived from all connections
+  const uniqueApps = $derived.by(() => {
+    const apps = new Set<string>();
+    for (const conn of $connectionList) {
+      if (conn.process_name) apps.add(conn.process_name);
+    }
+    return [...apps].sort((a, b) => a.localeCompare(b, 'fr'));
+  });
 
   // Sync local state to store
   $effect(() => {
@@ -35,9 +48,31 @@
     });
   });
 
+  // Apply additional local filters (app, port) on top of store-filtered results
+  const localFiltered = $derived.by(() => {
+    let list = $filteredConnections;
+
+    // Application filter
+    if (applicationFilter) {
+      list = list.filter((c) => c.process_name === applicationFilter);
+    }
+
+    // Port filter (match source or destination port)
+    if (portFilter) {
+      const portNum = parseInt(portFilter, 10);
+      if (!isNaN(portNum)) {
+        list = list.filter(
+          (c) => c.source?.port === portNum || c.destination?.port === portNum
+        );
+      }
+    }
+
+    return list;
+  });
+
   // Sort the filtered connections
   const sortedConnections = $derived.by(() => {
-    const list = [...$filteredConnections];
+    const list = [...localFiltered];
     list.sort((a, b) => {
       let valA: string | number = '';
       let valB: string | number = '';
@@ -55,13 +90,21 @@
           valA = a.user || '';
           valB = b.user || '';
           break;
-        case 'source':
+        case 'source_ip':
           valA = a.source?.ip || '';
           valB = b.source?.ip || '';
           break;
-        case 'destination':
+        case 'source_port':
+          valA = a.source?.port || 0;
+          valB = b.source?.port || 0;
+          break;
+        case 'dest_ip':
           valA = a.destination?.ip || '';
           valB = b.destination?.ip || '';
+          break;
+        case 'dest_port':
+          valA = a.destination?.port || 0;
+          valB = b.destination?.port || 0;
           break;
         case 'protocol':
           valA = a.protocol;
@@ -121,6 +164,8 @@
     protocolFilter = '';
     verdictFilter = '';
     directionFilter = '';
+    applicationFilter = '';
+    portFilter = '';
   }
 
   function formatAddr(addr: { ip: string; port: number } | undefined): string {
@@ -128,13 +173,36 @@
     return `${addr.ip}:${addr.port}`;
   }
 
+  // Resolve an app icon path to a displayable src URL
+  function resolveIconSrc(iconPath: string | undefined): string | null {
+    if (!iconPath) return null;
+    try {
+      return convertFileSrc(iconPath);
+    } catch {
+      return null;
+    }
+  }
+
+  // Track broken icon images to fall back to generic icon
+  let brokenIcons = $state(new Set<string>());
+
+  function handleIconError(connId: string) {
+    brokenIcons = new Set([...brokenIcons, connId]);
+  }
+
+  const hasActiveFilters = $derived(
+    searchValue || protocolFilter || verdictFilter || directionFilter || applicationFilter || portFilter
+  );
+
   // Column definitions for sort headers
   const columns = [
     { key: 'process_name', label: fr.conn_application },
     { key: 'pid', label: fr.conn_pid },
     { key: 'user', label: fr.conn_user },
-    { key: 'source', label: fr.conn_local_addr },
-    { key: 'destination', label: fr.conn_remote_addr },
+    { key: 'source_ip', label: fr.conn_source_ip },
+    { key: 'source_port', label: fr.conn_source_port },
+    { key: 'dest_ip', label: fr.conn_dest_ip },
+    { key: 'dest_port', label: fr.conn_dest_port },
     { key: 'protocol', label: fr.conn_protocol },
     { key: 'state', label: fr.conn_state },
     { key: 'verdict', label: fr.conn_verdict },
@@ -183,7 +251,22 @@
     <option value="outbound">{fr.conn_outbound}</option>
   </select>
 
-  {#if searchValue || protocolFilter || verdictFilter || directionFilter}
+  <select class="filter-select" bind:value={applicationFilter}>
+    <option value="">{fr.conn_all_apps}</option>
+    {#each uniqueApps as appName}
+      <option value={appName}>{appName}</option>
+    {/each}
+  </select>
+
+  <div class="filter-port">
+    <Input
+      type="text"
+      placeholder={fr.conn_filter_port}
+      bind:value={portFilter}
+    />
+  </div>
+
+  {#if hasActiveFilters}
     <Button variant="ghost" size="sm" onclick={clearFilters}>
       {fr.conn_clear_filters}
     </Button>
@@ -218,11 +301,31 @@
           tabindex="0"
           onkeydown={(e) => e.key === 'Enter' && toggleExpand(conn.id)}
         >
-          <div class="td-cell truncate">{conn.process_name || fr.conn_unknown}</div>
+          <div class="td-cell truncate app-cell">
+            {#if conn.icon && resolveIconSrc(conn.icon) && !brokenIcons.has(conn.id)}
+              <img
+                class="app-icon-img"
+                src={resolveIconSrc(conn.icon)}
+                alt=""
+                width="16"
+                height="16"
+                onerror={() => handleIconError(conn.id)}
+              />
+            {:else}
+              <svg class="app-icon-fallback" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+            {/if}
+            <span class="truncate">{conn.process_name || fr.conn_unknown}</span>
+          </div>
           <div class="td-cell font-mono">{conn.pid || '--'}</div>
           <div class="td-cell truncate">{conn.user || '--'}</div>
-          <div class="td-cell font-mono truncate">{formatAddr(conn.source)}</div>
-          <div class="td-cell font-mono truncate">{formatAddr(conn.destination)}</div>
+          <div class="td-cell font-mono truncate">{conn.source?.ip || '--'}</div>
+          <div class="td-cell font-mono">{conn.source?.port || '--'}</div>
+          <div class="td-cell font-mono truncate">{conn.destination?.ip || '--'}</div>
+          <div class="td-cell font-mono">{conn.destination?.port || '--'}</div>
           <div class="td-cell">
             <Badge variant="cyan" label={conn.protocol.toUpperCase()} />
           </div>
@@ -376,6 +479,11 @@
     color: var(--text-primary);
   }
 
+  .filter-port {
+    min-width: 130px;
+    max-width: 160px;
+  }
+
   /* Table */
   .table-wrapper {
     border: 1px solid var(--border-primary);
@@ -489,5 +597,22 @@
     font-size: var(--font-size-sm);
     color: var(--text-primary);
     word-break: break-all;
+  }
+
+  /* App icon in table cell */
+  .app-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .app-icon-img {
+    flex-shrink: 0;
+    border-radius: 2px;
+    object-fit: contain;
+  }
+
+  .app-icon-fallback {
+    flex-shrink: 0;
   }
 </style>

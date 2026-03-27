@@ -281,6 +281,7 @@ mod tests {
             started_at: Utc::now(),
             verdict: ConnectionVerdict::Unknown,
             matched_rule: None,
+            remote_hostname: None,
         }
     }
 
@@ -298,6 +299,7 @@ mod tests {
                 process_name: Some("curl".to_string()),
                 process_path: None,
                 user: Some("seb".to_string()),
+                hostname: None,
             },
             requested_at: Utc::now(),
             expires_at: Utc::now() + Duration::minutes(5),

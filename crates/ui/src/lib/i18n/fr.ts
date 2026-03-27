@@ -184,6 +184,7 @@ export const fr = {
   audit_from: 'De',
   audit_to: 'À',
   audit_filter_all: 'Tous',
+  audit_metadata: 'Métadonnées',
 
   // Dashboard - extra
   dash_refresh: 'Rafraîchir',
@@ -198,6 +199,13 @@ export const fr = {
   conn_direction: 'Direction',
   conn_source: 'Source',
   conn_destination: 'Destination',
+  conn_source_ip: 'IP source',
+  conn_source_port: 'Port source',
+  conn_dest_ip: 'IP dest.',
+  conn_dest_port: 'Port dest.',
+  conn_filter_application: 'Application',
+  conn_filter_port: 'Filtrer par port...',
+  conn_all_apps: 'Toutes les applications',
 
   // Rules - extra
   rules_enabled: 'Activée',

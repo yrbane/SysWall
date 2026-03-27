@@ -430,6 +430,7 @@ mod tests {
             process_name: Some("curl".to_string()),
             process_path: None,
             user: Some("seb".to_string()),
+            hostname: None,
         }
     }
 
@@ -578,6 +579,7 @@ mod tests {
             started_at: Utc::now(),
             verdict: ConnectionVerdict::Unknown,
             matched_rule: None,
+            remote_hostname: None,
         };
         let event = DomainEvent::ConnectionDetected(conn);
         let msg = domain_event_to_proto(&event);

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use syswall_domain::entities::Connection;
 use syswall_domain::errors::DomainError;
 use syswall_domain::events::{DefaultPolicy, DomainEvent};
-use syswall_domain::ports::{EventBus, ProcessResolver, RuleRepository};
+use syswall_domain::ports::{DnsResolver, EventBus, ProcessResolver, RuleRepository};
 use syswall_domain::services::PolicyEngine;
 
 /// Service for processing network connections (enrichment + policy evaluation).
@@ -16,6 +16,9 @@ pub struct ConnectionService {
     rule_repo: Arc<dyn RuleRepository>,
     event_bus: Arc<dyn EventBus>,
     default_policy: DefaultPolicy,
+    /// DNS resolver for reverse IP lookups on remote addresses.
+    /// Résolveur DNS pour les recherches IP inverses sur les adresses distantes.
+    dns_resolver: Arc<dyn DnsResolver>,
 }
 
 impl ConnectionService {
@@ -24,12 +27,14 @@ impl ConnectionService {
         rule_repo: Arc<dyn RuleRepository>,
         event_bus: Arc<dyn EventBus>,
         default_policy: DefaultPolicy,
+        dns_resolver: Arc<dyn DnsResolver>,
     ) -> Self {
         Self {
             process_resolver,
             rule_repo,
             event_bus,
             default_policy,
+            dns_resolver,
         }
     }
 
@@ -75,6 +80,23 @@ impl ConnectionService {
                 Err(e) => {
                     tracing::warn!("Process resolution failed for {:?} {}:{} -> {}:{}: {}",
                         connection.protocol, local_ip, local_port, remote_ip, remote_port, e);
+                }
+            }
+        }
+
+        // Resolve remote hostname (best-effort, non-blocking on failure)
+        // Résolution du nom d'hôte distant (best-effort, non-bloquant en cas d'échec)
+        if connection.remote_hostname.is_none() {
+            let remote_ip = connection.destination.ip;
+            match self.dns_resolver.resolve(remote_ip).await {
+                Ok(hostname) => {
+                    if let Some(ref name) = hostname {
+                        tracing::debug!("Resolved hostname for {}: {}", remote_ip, name);
+                    }
+                    connection.remote_hostname = hostname;
+                }
+                Err(e) => {
+                    tracing::warn!("DNS resolution failed for {}: {}", remote_ip, e);
                 }
             }
         }
@@ -147,6 +169,7 @@ mod tests {
             started_at: Utc::now(),
             verdict: ConnectionVerdict::Unknown,
             matched_rule: None,
+            remote_hostname: None,
         }
     }
 
@@ -155,12 +178,14 @@ mod tests {
         let process_resolver = Arc::new(FakeProcessResolver::new());
         let rule_repo = Arc::new(FakeRuleRepository::new());
         let event_bus = Arc::new(FakeEventBus::new());
+        let dns_resolver = Arc::new(FakeDnsResolver::new());
 
         let service = ConnectionService::new(
             process_resolver,
             rule_repo,
             event_bus,
             DefaultPolicy::Block,
+            dns_resolver,
         );
 
         let conn = service.process_connection(test_connection()).await.unwrap();
@@ -192,11 +217,13 @@ mod tests {
             .await
             .unwrap();
 
+        let dns_resolver = Arc::new(FakeDnsResolver::new());
         let service = ConnectionService::new(
             process_resolver,
             rule_repo,
             event_bus,
             DefaultPolicy::Block,
+            dns_resolver,
         );
 
         let conn = service.process_connection(test_connection()).await.unwrap();

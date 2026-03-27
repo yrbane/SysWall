@@ -99,12 +99,24 @@ pub struct MonitoringConfig {
     pub conntrack_binary_path: std::path::PathBuf,
     #[serde(default = "default_conntrack_protocols")]
     pub conntrack_protocols: Vec<String>,
+    #[serde(default = "default_dns_cache_capacity")]
+    pub dns_cache_capacity: usize,
+    #[serde(default = "default_dns_cache_ttl")]
+    pub dns_cache_ttl_secs: u64,
     #[serde(default)]
     pub use_fake: bool,
 }
 
 fn default_cache_capacity() -> usize {
     1024
+}
+
+fn default_dns_cache_capacity() -> usize {
+    4096
+}
+
+fn default_dns_cache_ttl() -> u64 {
+    300
 }
 
 fn default_conntrack_path() -> std::path::PathBuf {

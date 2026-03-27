@@ -61,6 +61,7 @@ export interface ConnectionSnapshot {
   process_name?: string;
   process_path?: string;
   user?: string;
+  icon?: string;
 }
 
 export interface DecisionResponse {

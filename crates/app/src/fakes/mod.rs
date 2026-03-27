@@ -3,6 +3,7 @@
 pub mod fake_audit_repository;
 pub mod fake_connection_monitor;
 pub mod fake_decision_repository;
+pub mod fake_dns_resolver;
 pub mod fake_event_bus;
 pub mod fake_firewall_engine;
 pub mod fake_pending_decision_repository;
@@ -13,6 +14,7 @@ pub mod fake_user_notifier;
 pub use fake_audit_repository::*;
 pub use fake_connection_monitor::*;
 pub use fake_decision_repository::*;
+pub use fake_dns_resolver::*;
 pub use fake_event_bus::*;
 pub use fake_firewall_engine::*;
 pub use fake_pending_decision_repository::*;

@@ -54,6 +54,7 @@ pub fn conntrack_to_connection(event: ConntrackEvent, local_ips: &[IpAddr]) -> O
         started_at: Utc::now(),
         verdict: ConnectionVerdict::Unknown,
         matched_rule: None,
+        remote_hostname: None,
     })
 }
 
