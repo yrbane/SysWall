@@ -401,11 +401,33 @@ impl ProcessResolver for ProcfsProcessResolver {
             .ok()
             .and_then(|cache| cache.table.get(&local_port).copied());
 
-        match pid {
+        if let Some(pid) = pid {
+            return self.resolve(pid).await;
+        }
+
+        // Fallback: direct ss query for this specific port (handles new/ephemeral connections)
+        let proto_flag = match protocol {
+            Protocol::Tcp => "-tnp",
+            Protocol::Udp => "-unp",
+            _ => return Ok(None),
+        };
+
+        let result = tokio::task::spawn_blocking(move || {
+            let output = std::process::Command::new("/usr/bin/ss")
+                .args([proto_flag, "sport", &format!("= :{}", local_port)])
+                .output()
+                .ok()?;
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            Self::parse_ss_pid(&stdout)
+        })
+        .await
+        .map_err(|e| DomainError::Infrastructure(format!("spawn_blocking failed: {}", e)))?;
+
+        match result {
             Some(pid) => self.resolve(pid).await,
             None => {
                 debug!(
-                    "No process in socket table for port {} ({}:{} -> {}:{} {:?})",
+                    "No process found for port {} ({}:{} -> {}:{} {:?})",
                     local_port, local_ip, local_port, remote_ip, remote_port, protocol
                 );
                 Ok(None)
