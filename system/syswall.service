@@ -12,10 +12,11 @@ RestartSec=5s
 WatchdogSec=30s
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_CHOWN CAP_FOWNER CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
 AmbientCapabilities=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
-ProtectSystem=strict
-ProtectHome=true
+# Note: ProtectSystem=strict disabled because the daemon needs full
+# /proc access to resolve process ownership of network sockets.
+# The daemon runs as root with restricted capabilities instead.
+ProtectHome=read-only
 PrivateTmp=true
-ProcSubset=all
 RuntimeDirectory=syswall
 RuntimeDirectoryMode=0755
 ReadWritePaths=/var/lib/syswall /var/log/syswall /var/run/syswall

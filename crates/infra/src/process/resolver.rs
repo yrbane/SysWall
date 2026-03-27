@@ -57,13 +57,19 @@ impl ProcfsProcessResolver {
         let table_clone = socket_table.clone();
         tokio::spawn(async move {
             loop {
-                if let Some(new_table) = tokio::task::spawn_blocking(|| Self::refresh_socket_table())
-                    .await
-                    .ok()
-                    .flatten()
-                {
-                    if let Ok(mut table) = table_clone.write() {
-                        *table = new_table;
+                match tokio::task::spawn_blocking(|| Self::refresh_socket_table()).await {
+                    Ok(Some(new_table)) => {
+                        let count = new_table.len();
+                        if let Ok(mut table) = table_clone.write() {
+                            *table = new_table;
+                        }
+                        debug!("Socket table refreshed: {} entries", count);
+                    }
+                    Ok(None) => {
+                        tracing::warn!("Socket table refresh returned empty (ss command failed?)");
+                    }
+                    Err(e) => {
+                        tracing::warn!("Socket table refresh task failed: {}", e);
                     }
                 }
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
