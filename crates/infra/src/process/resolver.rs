@@ -130,49 +130,67 @@ impl ProcfsProcessResolver {
         ))
     }
 
-    /// Refresh the socket table by running `ss -tnp -unp` and parsing all entries.
+    /// Refresh the socket table by running `ss -tnp` and `ss -unp` separately.
     /// Returns a map of local_port → PID for all sockets with known processes.
     ///
-    /// Rafraîchit la table des sockets via `ss -tnp -unp`.
+    /// Rafraîchit la table des sockets via `ss -tnp` et `ss -unp`.
     fn refresh_socket_table() -> Option<std::collections::HashMap<u16, u32>> {
-        let output = std::process::Command::new("ss")
-            .args(["-tnp", "-unp", "state", "all"])
-            .output()
-            .ok()?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
         let mut table = std::collections::HashMap::new();
 
-        for line in stdout.lines().skip(1) {
-            // Extract local port and PID
-            // Format: STATE  RECV SEND  LOCAL:PORT  REMOTE:PORT  users:(("name",pid=NNN,fd=N))
-            let pid = match Self::parse_ss_pid(line) {
-                Some(p) => p,
-                None => continue,
-            };
+        // Run TCP and UDP separately to get consistent column format
+        for args in &[&["-tnp", "state", "all"][..], &["-unp", "state", "all"][..]] {
+            let output = std::process::Command::new("ss")
+                .args(*args)
+                .output()
+                .ok()?;
 
-            let local_port = match Self::parse_ss_local_port(line) {
-                Some(p) => p,
-                None => continue,
-            };
+            let stdout = String::from_utf8_lossy(&output.stdout);
 
-            table.insert(local_port, pid);
+            for line in stdout.lines().skip(1) {
+                let pid = match Self::parse_ss_pid(line) {
+                    Some(p) => p,
+                    None => continue,
+                };
+
+                // Find ALL port numbers in the line before "users:" and associate with this PID
+                // The local address:port is the field that comes before the peer address
+                let local_port = match Self::parse_ss_local_port(line) {
+                    Some(p) => p,
+                    None => continue,
+                };
+
+                table.insert(local_port, pid);
+            }
         }
 
         Some(table)
     }
 
     /// Extract local port from an ss output line.
+    /// Format: `State Recv-Q Send-Q  LOCAL_ADDR:PORT  PEER_ADDR:PORT  users:(...)`
+    /// The columns are variable-width, so we find port numbers by splitting on `:`.
+    /// The first `:PORT` pattern with a numeric port after the state fields is the local port.
     fn parse_ss_local_port(line: &str) -> Option<u16> {
-        // Fields are whitespace-separated. Local address is field 4 (0-indexed: 3)
+        // Split into fields, find the first field containing ':' followed by a number
+        // that isn't the header and isn't the peer address
         let fields: Vec<&str> = line.split_whitespace().collect();
-        if fields.len() < 5 {
-            return None;
+        // Skip State(0), Recv-Q(1), Send-Q(2) — local addr starts at field 3
+        // But "Local Address:Port" in header is 2 words, actual data is 1 word like "127.0.0.1:6379"
+        for field in fields.iter().skip(3) {
+            // Stop when we hit "users:" or "Process"
+            if field.starts_with("users:") || *field == "Process" {
+                break;
+            }
+            // Try to extract port from addr:port format
+            if let Some(port_str) = field.rsplit(':').next() {
+                if let Ok(port) = port_str.parse::<u16>() {
+                    if port > 0 {
+                        return Some(port);
+                    }
+                }
+            }
         }
-        let local_addr = fields[3];
-        // Port is after the last ':'
-        let port_str = local_addr.rsplit(':').next()?;
-        port_str.parse().ok()
+        None
     }
 
     /// Extract PID from an ss output line.
