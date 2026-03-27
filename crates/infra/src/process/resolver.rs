@@ -36,6 +36,9 @@ impl Default for ProcfsConfig {
 pub struct ProcfsProcessResolver {
     cache: ProcessCache,
     icon_resolver: super::icon_resolver::IconResolver,
+    /// Periodically refreshed map: (local_port) → (pid, process_name)
+    /// Carte mise à jour périodiquement : (port_local) → (pid, nom_processus)
+    socket_table: std::sync::Arc<std::sync::RwLock<std::collections::HashMap<u16, u32>>>,
 }
 
 impl ProcfsProcessResolver {
@@ -48,9 +51,29 @@ impl ProcfsProcessResolver {
             ));
         }
 
+        let socket_table = std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
+
+        // Spawn background task to refresh socket table every 2 seconds
+        let table_clone = socket_table.clone();
+        tokio::spawn(async move {
+            loop {
+                if let Some(new_table) = tokio::task::spawn_blocking(|| Self::refresh_socket_table())
+                    .await
+                    .ok()
+                    .flatten()
+                {
+                    if let Ok(mut table) = table_clone.write() {
+                        *table = new_table;
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+        });
+
         Ok(Self {
             cache: ProcessCache::new(config.cache_capacity, config.cache_ttl),
             icon_resolver: super::icon_resolver::IconResolver::new(),
+            socket_table,
         })
     }
 
@@ -103,6 +126,59 @@ impl ProcfsProcessResolver {
             },
             user,
         ))
+    }
+
+    /// Refresh the socket table by running `ss -tnp -unp` and parsing all entries.
+    /// Returns a map of local_port → PID for all sockets with known processes.
+    ///
+    /// Rafraîchit la table des sockets via `ss -tnp -unp`.
+    fn refresh_socket_table() -> Option<std::collections::HashMap<u16, u32>> {
+        let output = std::process::Command::new("ss")
+            .args(["-tnp", "-unp", "state", "all"])
+            .output()
+            .ok()?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut table = std::collections::HashMap::new();
+
+        for line in stdout.lines().skip(1) {
+            // Extract local port and PID
+            // Format: STATE  RECV SEND  LOCAL:PORT  REMOTE:PORT  users:(("name",pid=NNN,fd=N))
+            let pid = match Self::parse_ss_pid(line) {
+                Some(p) => p,
+                None => continue,
+            };
+
+            let local_port = match Self::parse_ss_local_port(line) {
+                Some(p) => p,
+                None => continue,
+            };
+
+            table.insert(local_port, pid);
+        }
+
+        Some(table)
+    }
+
+    /// Extract local port from an ss output line.
+    fn parse_ss_local_port(line: &str) -> Option<u16> {
+        // Fields are whitespace-separated. Local address is field 4 (0-indexed: 3)
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        if fields.len() < 5 {
+            return None;
+        }
+        let local_addr = fields[3];
+        // Port is after the last ':'
+        let port_str = local_addr.rsplit(':').next()?;
+        port_str.parse().ok()
+    }
+
+    /// Extract PID from an ss output line.
+    fn parse_ss_pid(line: &str) -> Option<u32> {
+        let pid_start = line.find("pid=")?;
+        let after_pid = &line[pid_start + 4..];
+        let pid_str: String = after_pid.chars().take_while(|c| c.is_ascii_digit()).collect();
+        pid_str.parse().ok().filter(|&p| p > 0)
     }
 
     /// Parse ss output to extract PID.
@@ -249,11 +325,10 @@ impl ProcessResolver for ProcfsProcessResolver {
         Ok(None)
     }
 
-    /// Resolve process info by connection 5-tuple using `ss -tnp` / `ss -unp`.
-    /// Uses the ss (socket statistics) command which queries the kernel via INET_DIAG
-    /// netlink and returns process info directly — much more reliable than /proc/net parsing.
+    /// Resolve process info by connection 5-tuple using a pre-built socket table.
+    /// The socket table is refreshed every 2 seconds by a background task running `ss`.
     ///
-    /// Résout les informations du processus par 5-tuple via `ss`.
+    /// Résout les informations du processus par 5-tuple via la table de sockets pré-indexée.
     async fn resolve_by_connection(
         &self,
         protocol: Protocol,
@@ -262,45 +337,20 @@ impl ProcessResolver for ProcfsProcessResolver {
         remote_ip: std::net::IpAddr,
         remote_port: u16,
     ) -> Result<Option<ProcessInfo>, DomainError> {
-        // Check cache by a synthetic key: "proto:local:port:remote:port"
-        let cache_key = format!("{}:{}:{}:{}:{}",
-            match protocol { Protocol::Tcp => "tcp", Protocol::Udp => "udp", _ => "other" },
-            local_ip, local_port, remote_ip, remote_port);
-
-        // Try to find PID via ss command
-        let proto_flag = match protocol {
-            Protocol::Tcp => "-t",
-            Protocol::Udp => "-u",
-            _ => return Ok(None),
+        // Look up PID from the pre-built socket table (keyed by local port)
+        let pid = {
+            let table = self.socket_table.read().map_err(|e| {
+                DomainError::Infrastructure(format!("socket table lock poisoned: {}", e))
+            })?;
+            table.get(&local_port).copied()
         };
 
-        let filter = format!("sport = :{} and dport = :{}", local_port, remote_port);
-
-        let result = tokio::task::spawn_blocking(move || {
-            let output = std::process::Command::new("ss")
-                .args([proto_flag, "-np", "state", "all", &filter])
-                .output();
-
-            match output {
-                Ok(out) => {
-                    let stdout = String::from_utf8_lossy(&out.stdout);
-                    Self::parse_ss_output(&stdout)
-                }
-                Err(e) => {
-                    debug!("ss command failed: {}", e);
-                    None
-                }
-            }
-        })
-        .await
-        .map_err(|e| DomainError::Infrastructure(format!("spawn_blocking failed: {}", e)))?;
-
-        match result {
+        match pid {
             Some(pid) => self.resolve(pid).await,
             None => {
                 debug!(
-                    "No process found via ss for {}:{} -> {}:{} ({:?})",
-                    local_ip, local_port, remote_ip, remote_port, protocol
+                    "No process in socket table for port {} ({}:{} -> {}:{} {:?})",
+                    local_port, local_ip, local_port, remote_ip, remote_port, protocol
                 );
                 Ok(None)
             }
