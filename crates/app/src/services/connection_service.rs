@@ -67,13 +67,14 @@ impl ConnectionService {
                     connection.process = Some(info);
                 }
                 Ok(None) => {
-                    tracing::trace!(
-                        "No process found for {}:{} -> {}:{}",
-                        local_ip, local_port, remote_ip, remote_port
+                    tracing::warn!(
+                        "No process found for {:?} {}:{} -> {}:{}",
+                        connection.protocol, local_ip, local_port, remote_ip, remote_port
                     );
                 }
                 Err(e) => {
-                    tracing::debug!("Process resolution failed: {}", e);
+                    tracing::warn!("Process resolution failed for {:?} {}:{} -> {}:{}: {}",
+                        connection.protocol, local_ip, local_port, remote_ip, remote_port, e);
                 }
             }
         }
