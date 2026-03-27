@@ -36,9 +36,28 @@ impl Default for ProcfsConfig {
 pub struct ProcfsProcessResolver {
     cache: ProcessCache,
     icon_resolver: super::icon_resolver::IconResolver,
-    /// Periodically refreshed map: (local_port) → (pid, process_name)
-    /// Carte mise à jour périodiquement : (port_local) → (pid, nom_processus)
-    socket_table: std::sync::Arc<std::sync::RwLock<std::collections::HashMap<u16, u32>>>,
+    /// Socket table: local_port → PID, refreshed lazily
+    socket_table: std::sync::Mutex<SocketTableCache>,
+}
+
+struct SocketTableCache {
+    table: std::collections::HashMap<u16, u32>,
+    last_refresh: std::time::Instant,
+    ttl: std::time::Duration,
+}
+
+impl SocketTableCache {
+    fn new(ttl: std::time::Duration) -> Self {
+        Self {
+            table: std::collections::HashMap::new(),
+            last_refresh: std::time::Instant::now() - ttl - ttl, // force first refresh
+            ttl,
+        }
+    }
+
+    fn is_stale(&self) -> bool {
+        self.last_refresh.elapsed() > self.ttl
+    }
 }
 
 impl ProcfsProcessResolver {
@@ -51,35 +70,12 @@ impl ProcfsProcessResolver {
             ));
         }
 
-        let socket_table = std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
-
-        // Spawn background task to refresh socket table every 2 seconds
-        let table_clone = socket_table.clone();
-        tokio::spawn(async move {
-            loop {
-                match tokio::task::spawn_blocking(|| Self::refresh_socket_table()).await {
-                    Ok(Some(new_table)) => {
-                        let count = new_table.len();
-                        if let Ok(mut table) = table_clone.write() {
-                            *table = new_table;
-                        }
-                        debug!("Socket table refreshed: {} entries", count);
-                    }
-                    Ok(None) => {
-                        tracing::warn!("Socket table refresh returned empty (ss command failed?)");
-                    }
-                    Err(e) => {
-                        tracing::warn!("Socket table refresh task failed: {}", e);
-                    }
-                }
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-            }
-        });
-
         Ok(Self {
             cache: ProcessCache::new(config.cache_capacity, config.cache_ttl),
             icon_resolver: super::icon_resolver::IconResolver::new(),
-            socket_table,
+            socket_table: std::sync::Mutex::new(SocketTableCache::new(
+                std::time::Duration::from_secs(2),
+            )),
         })
     }
 
@@ -331,10 +327,10 @@ impl ProcessResolver for ProcfsProcessResolver {
         Ok(None)
     }
 
-    /// Resolve process info by connection 5-tuple using a pre-built socket table.
-    /// The socket table is refreshed every 2 seconds by a background task running `ss`.
+    /// Resolve process info by connection 5-tuple using a lazily-refreshed socket table.
+    /// The table is rebuilt from `ss -tnp -unp` if older than 2 seconds.
     ///
-    /// Résout les informations du processus par 5-tuple via la table de sockets pré-indexée.
+    /// Résout les informations du processus par 5-tuple via une table de sockets rafraîchie à la demande.
     async fn resolve_by_connection(
         &self,
         protocol: Protocol,
@@ -343,13 +339,37 @@ impl ProcessResolver for ProcfsProcessResolver {
         remote_ip: std::net::IpAddr,
         remote_port: u16,
     ) -> Result<Option<ProcessInfo>, DomainError> {
-        // Look up PID from the pre-built socket table (keyed by local port)
-        let pid = {
-            let table = self.socket_table.read().map_err(|e| {
-                DomainError::Infrastructure(format!("socket table lock poisoned: {}", e))
-            })?;
-            table.get(&local_port).copied()
-        };
+        // Refresh socket table if stale
+        let needs_refresh = self
+            .socket_table
+            .lock()
+            .map(|cache| cache.is_stale())
+            .unwrap_or(true);
+
+        if needs_refresh {
+            let new_table =
+                tokio::task::spawn_blocking(|| Self::refresh_socket_table())
+                    .await
+                    .map_err(|e| {
+                        DomainError::Infrastructure(format!("spawn_blocking failed: {}", e))
+                    })?;
+
+            if let Some(table) = new_table {
+                let count = table.len();
+                if let Ok(mut cache) = self.socket_table.lock() {
+                    cache.table = table;
+                    cache.last_refresh = std::time::Instant::now();
+                }
+                debug!("Socket table refreshed: {} entries", count);
+            }
+        }
+
+        // Look up PID from socket table
+        let pid = self
+            .socket_table
+            .lock()
+            .ok()
+            .and_then(|cache| cache.table.get(&local_port).copied());
 
         match pid {
             Some(pid) => self.resolve(pid).await,
