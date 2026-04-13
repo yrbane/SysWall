@@ -33,10 +33,9 @@ ProtectKernelLogs=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 
 # --- Restriction des appels système / System call restrictions ---
-# @system-service : ensemble de base pour les services / base set for services
-# @network-io : opérations réseau / network operations
-# bpf, perf_event_open : nécessaires pour eBPF / needed for eBPF
-SystemCallFilter=@system-service @network-io bpf perf_event_open
+# Liste noire : bloquer les catégories dangereuses sans casser le runtime
+# Blacklist: block dangerous categories without breaking the runtime
+SystemCallFilter=~@clock @cpu-emulation @debug @module @mount @obsolete @raw-io @reboot @swap
 SystemCallArchitectures=native
 
 # --- Divers / Miscellaneous ---
