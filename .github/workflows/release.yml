@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build daemon
+        run: cargo build --release -p syswall-daemon
+
+      - name: Build UI (Tauri)
+        run: |
+          cd crates/ui
+          npm ci
+          npm run build
+          cd src-tauri
+          cargo build --release
+
+      - name: Package artifacts
+        run: |
+          mkdir -p dist
+          cp target/release/syswall-daemon dist/
+          cp crates/ui/src-tauri/target/release/ui dist/syswall-ui 2>/dev/null || true
+          cp system/syswall.service dist/
+          cp system/syswall.desktop dist/
+          cp config/default.toml dist/config.toml
+          tar czf syswall-${{ github.ref_name }}-x86_64-linux.tar.gz -C dist .
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: syswall-build
+          path: syswall-*.tar.gz
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: syswall-build
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: syswall-*.tar.gz
+          generate_release_notes: true
