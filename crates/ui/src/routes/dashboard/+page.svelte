@@ -12,6 +12,7 @@
   } from '$lib/stores/dashboard';
   import { connectionCounts } from '$lib/stores/connections';
   import { fetchStatus, firewallStatus } from '$lib/stores/status';
+  import { convertFileSrc } from '@tauri-apps/api/core';
   import { onMount, onDestroy } from 'svelte';
 
   let refreshing = $state(false);
@@ -48,6 +49,27 @@
   onDestroy(() => {
     clearInterval(autoRefreshInterval);
   });
+
+  // Formate les descriptions d'alerte — extrait du texte lisible du JSON brut
+  // Format alert descriptions — extract readable text from raw JSON
+  function formatAlertDesc(desc: string): string {
+    if (!desc) return '--';
+    const trimmed = desc.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const p = JSON.parse(trimmed);
+        const parts: string[] = [];
+        if (p.process?.name || p.process_name) parts.push(p.process?.name || p.process_name);
+        if (p.destination?.ip) parts.push(`→ ${p.destination.ip}${p.destination?.port ? ':' + p.destination.port : ''}`);
+        if (p.protocol) parts.push(typeof p.protocol === 'string' ? p.protocol.toUpperCase() : '');
+        if (p.verdict) parts.push(p.verdict);
+        if (p.message) parts.push(p.message);
+        if (p.error) parts.push(p.error);
+        if (parts.length > 0) return parts.filter(Boolean).join(' — ');
+      } catch { /* pas du JSON valide */ }
+    }
+    return desc;
+  }
 
   // Severity color mapping for alerts
   function severityVariant(sev: string): 'red' | 'orange' | 'purple' | 'neutral' {
@@ -102,6 +124,13 @@
       {#each $topApps as app, i}
         <div class="top-item">
           <span class="rank font-mono">{i + 1}</span>
+          <span class="app-icon-small">
+            {#if app.icon}
+              <img src={convertFileSrc(app.icon)} alt="" width="18" height="18" class="app-icon-img" />
+            {:else}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
+            {/if}
+          </span>
           <span class="top-item-name truncate">{app.name}</span>
           <span class="top-item-count font-mono text-cyan">{app.count}</span>
         </div>
@@ -117,7 +146,8 @@
       {#each $topDestinations as dest, i}
         <div class="top-item">
           <span class="rank font-mono">{i + 1}</span>
-          <span class="top-item-name truncate font-mono">{dest.ip}</span>
+          <span class="top-item-name truncate font-mono">{dest.ip}<span class="text-tertiary">:{dest.port}</span></span>
+          <Badge variant="cyan" label={dest.service} />
           <span class="top-item-count font-mono text-cyan">{dest.count}</span>
         </div>
       {/each}
@@ -133,7 +163,7 @@
         {#each $recentAlerts.slice(0, 10) as alert}
           <div class="alert-item">
             <Badge variant={severityVariant(alert.severity)} label={alert.severity} />
-            <span class="alert-desc text-sm truncate">{alert.description}</span>
+            <span class="alert-desc text-sm truncate">{formatAlertDesc(alert.description)}</span>
             <span class="alert-time text-tertiary text-xs font-mono">
               {new Date(alert.timestamp).toLocaleTimeString('fr-FR')}
             </span>
@@ -230,6 +260,20 @@
     font-size: var(--font-size-xs);
     width: 1.5em;
     flex-shrink: 0;
+  }
+
+  .app-icon-small {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .app-icon-img {
+    border-radius: 3px;
+    object-fit: contain;
   }
 
   .top-item-name {

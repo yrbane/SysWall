@@ -41,32 +41,60 @@ export function stopTrafficTrend(): void {
   }
 }
 
-// Top applications by connection count
+// Mapping ports connus vers noms de service / Well-known port names
+const WELL_KNOWN_PORTS: Record<number, string> = {
+  22: 'SSH', 25: 'SMTP', 53: 'DNS', 80: 'HTTP', 110: 'POP3',
+  143: 'IMAP', 443: 'HTTPS', 465: 'SMTPS', 587: 'SMTP', 853: 'DoT',
+  993: 'IMAPS', 995: 'POP3S', 3306: 'MySQL', 5432: 'PostgreSQL',
+  5900: 'VNC', 6379: 'Redis', 8080: 'HTTP-Alt', 8443: 'HTTPS-Alt',
+  9090: 'Prometheus', 27017: 'MongoDB',
+};
+
+function portLabel(port: number): string {
+  return WELL_KNOWN_PORTS[port] || String(port);
+}
+
+// Top applications by connection count (avec icône)
+// Top applications by connection count (with icon)
 export const topApps = derived(connections, ($conns) => {
-  const counts = new Map<string, number>();
+  const apps = new Map<string, { count: number; icon?: string }>();
   for (const conn of $conns.values()) {
     if (conn.state === 'closed') continue;
     const name = conn.process_name || 'Inconnu';
-    counts.set(name, (counts.get(name) || 0) + 1);
+    const existing = apps.get(name);
+    if (existing) {
+      existing.count++;
+      if (!existing.icon && conn.icon) existing.icon = conn.icon;
+    } else {
+      apps.set(name, { count: 1, icon: conn.icon });
+    }
   }
-  return Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
+  return Array.from(apps.entries())
+    .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 5)
-    .map(([name, count]) => ({ name, count }));
+    .map(([name, data]) => ({ name, count: data.count, icon: data.icon }));
 });
 
-// Top destinations by IP
+// Top destinations par IP:port (avec nom de service)
+// Top destinations by IP:port (with service name)
 export const topDestinations = derived(connections, ($conns) => {
-  const counts = new Map<string, number>();
+  const dests = new Map<string, { ip: string; port: number; count: number }>();
   for (const conn of $conns.values()) {
     if (conn.state === 'closed') continue;
     const ip = conn.destination?.ip || 'Inconnu';
-    counts.set(ip, (counts.get(ip) || 0) + 1);
+    const port = conn.destination?.port || 0;
+    const key = `${ip}:${port}`;
+    const existing = dests.get(key);
+    if (existing) {
+      existing.count++;
+    } else {
+      dests.set(key, { ip, port, count: 1 });
+    }
   }
-  return Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
+  return Array.from(dests.values())
+    .sort((a, b) => b.count - a.count)
     .slice(0, 5)
-    .map(([ip, count]) => ({ ip, count }));
+    .map((d) => ({ ip: d.ip, port: d.port, service: portLabel(d.port), count: d.count }));
 });
 
 // Recent alerts (system errors from audit)

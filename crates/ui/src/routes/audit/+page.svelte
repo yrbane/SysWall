@@ -103,6 +103,22 @@
     return desc;
   }
 
+  // Colorise les éléments clés dans la description
+  // Colorize key elements in the description
+  function colorizeDescription(desc: string): string {
+    return desc
+      // Adresses IP:port en cyan
+      .replace(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?::\d+)?)/g, '<span class="text-cyan font-mono">$1</span>')
+      // Verdicts
+      .replace(/\b(Allowed|allowed|autorisé)\b/g, '<span style="color:var(--accent-green)">$1</span>')
+      .replace(/\b(Blocked|blocked|bloqué)\b/g, '<span style="color:var(--accent-red)">$1</span>')
+      .replace(/\b(PendingDecision|pending_decision)\b/g, '<span style="color:var(--accent-orange)">$1</span>')
+      // Protocoles
+      .replace(/\b(TCP|UDP|ICMP)\b/g, '<span class="font-mono" style="color:var(--accent-cyan)">$1</span>')
+      // Noms d'apps (entre "de " et " vers")
+      .replace(/(de\s+)(\S+)(\s+vers)/g, '$1<strong>$2</strong>$3');
+  }
+
   // Check if metadata has entries worth displaying
   function hasMetadata(metadata: Record<string, string> | undefined): boolean {
     if (!metadata) return false;
@@ -187,7 +203,7 @@
     <div class="table-body">
       {#each $paginatedAuditEvents as event (event.id)}
         <div
-          class="table-row"
+          class="table-row sev-{event.severity}"
           class:expanded={expandedEventId === event.id}
           onclick={() => hasMetadata(event.metadata) && toggleEventExpand(event.id)}
           role={hasMetadata(event.metadata) ? 'button' : undefined}
@@ -204,7 +220,7 @@
             <Badge variant={categoryVariant(event.category)} label={categoryLabel(event.category)} />
           </div>
           <div class="col col-description truncate" title={formatDescription(event.description)}>
-            {formatDescription(event.description)}
+            {@html colorizeDescription(formatDescription(event.description))}
           </div>
           <div class="col col-metadata">
             {#if hasMetadata(event.metadata)}
@@ -344,8 +360,18 @@
     align-items: center;
     padding: var(--space-2) var(--space-4);
     border-bottom: 1px solid var(--border-subtle);
-    transition: background var(--transition-fast);
+    border-left: 3px solid transparent;
+    transition: background var(--transition-fast), border-left-color var(--transition-fast);
   }
+
+  .table-row :global(.text-cyan) { color: var(--accent-cyan); }
+
+  /* Bande de couleur selon la sévérité / Color band by severity */
+  .table-row.sev-info { border-left-color: var(--accent-cyan); }
+  .table-row.sev-warning { border-left-color: var(--accent-orange); }
+  .table-row.sev-error { border-left-color: var(--accent-red); }
+  .table-row.sev-critical { border-left-color: var(--accent-purple, #a855f7); }
+  .table-row.sev-debug { border-left-color: var(--text-tertiary); }
 
   .table-row:last-child {
     border-bottom: none;
