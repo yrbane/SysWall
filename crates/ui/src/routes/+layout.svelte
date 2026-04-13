@@ -2,6 +2,7 @@
   import '../app.css';
   import Sidebar from '$lib/components/ui/Sidebar.svelte';
   import ErrorBanner from '$lib/components/ui/ErrorBanner.svelte';
+  import Toast from '$lib/components/ui/Toast.svelte';
   import { fr } from '$lib/i18n/fr';
   import { firewallStatus, fetchStatus, initStatusListener, statusError } from '$lib/stores/status';
   import { initConnectionListeners, connectionCounts } from '$lib/stores/connections';
@@ -71,6 +72,8 @@
     {/if}
     {@render children()}
   </main>
+
+  <Toast />
 </div>
 
 <style>
