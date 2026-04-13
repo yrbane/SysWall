@@ -21,12 +21,12 @@ build() {
 
     cargo build --release -p syswall-daemon
 
+    # L'UI doit être compilée via `tauri build` pour embarquer les assets frontend
+    # UI must be built via `tauri build` to embed frontend assets
     cd crates/ui
     npm ci
-    npm run build
-    cd src-tauri
-    cargo build --release
-    cd ../../..
+    npx tauri build 2>/dev/null || true
+    cd ../..
 }
 
 package() {

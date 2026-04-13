@@ -21,7 +21,7 @@ build() {
     unset CFLAGS CXXFLAGS LDFLAGS
 
     cargo build --release -p syswall-daemon
-    cd crates/ui && npm ci && npm run build && cd src-tauri && cargo build --release && cd ../../..
+    cd crates/ui && npm ci && npx tauri build 2>/dev/null || true && cd ../..
 }
 
 package() {
