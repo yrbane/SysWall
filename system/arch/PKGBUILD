@@ -1,0 +1,36 @@
+# Maintainer: yrbane <yrbane@github>
+pkgname=syswall
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="Application-level firewall for Linux desktop / Pare-feu applicatif pour bureau Linux"
+arch=('x86_64')
+url="https://github.com/yrbane/SysWall"
+license=('MIT')
+depends=('nftables' 'conntrack-tools' 'sqlite' 'webkit2gtk-4.1' 'gtk3')
+makedepends=('rust' 'cargo' 'nodejs' 'npm' 'libcap')
+backup=('etc/syswall/config.toml')
+install=syswall.install
+
+build() {
+    cd "$startdir/../.."
+    cargo build --release -p syswall-daemon
+    cd crates/ui
+    npm ci
+    npm run build
+    cd src-tauri
+    cargo build --release
+    cd ../../..
+}
+
+package() {
+    cd "$startdir/../.."
+    install -Dm755 target/release/syswall-daemon "$pkgdir/usr/bin/syswall-daemon"
+    local ui_bin="crates/ui/src-tauri/target/release/ui"
+    if [ -f "$ui_bin" ]; then
+        install -Dm755 "$ui_bin" "$pkgdir/usr/bin/syswall-ui"
+    fi
+    install -Dm644 system/syswall.service "$pkgdir/usr/lib/systemd/system/syswall.service"
+    install -Dm644 system/syswall.desktop "$pkgdir/usr/share/applications/syswall.desktop"
+    install -Dm644 config/default.toml "$pkgdir/etc/syswall/config.toml"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
