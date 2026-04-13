@@ -18,11 +18,14 @@ use events::SocketEvent;
 /// Maps (protocol, local_port) → PID for O(1) lookups.
 type SocketMap = DashMap<(u8, u16), u32>;
 
-// Chemin vers le programme BPF compilé, embarqué à la compilation.
-// Path to compiled BPF program, embedded at build time.
-const BPF_PROG_BYTES: &[u8] = include_bytes!(
-    "../../ebpf-prog/target/bpfel-unknown-none/release/syswall-ebpf-prog"
-);
+// Programme BPF pré-compilé, embarqué dans le binaire.
+// Regénérer avec : cd crates/ebpf-prog && cargo +nightly build --release
+// Puis copier : cp crates/ebpf-prog/target/bpfel-unknown-none/release/syswall-ebpf-prog crates/ebpf/bpf/
+//
+// Pre-built BPF program, embedded in the binary.
+// Regenerate with: cd crates/ebpf-prog && cargo +nightly build --release
+// Then copy: cp crates/ebpf-prog/target/bpfel-unknown-none/release/syswall-ebpf-prog crates/ebpf/bpf/
+const BPF_PROG_BYTES: &[u8] = include_bytes!("../bpf/syswall-ebpf-prog");
 
 /// Résolveur de processus basé sur eBPF.
 /// Charge un programme BPF qui hooke inet_sock_set_state et capture le PID par socket.
