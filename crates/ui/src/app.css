@@ -209,6 +209,39 @@ body {
   50% { box-shadow: 0 0 20px rgba(0, 212, 255, 0.5); }
 }
 
+/* --- Responsive Breakpoints --- */
+
+/* Mobile : barre de navigation en bas / bottom tab bar */
+@media (max-width: 639px) {
+  :root {
+    --sidebar-width: 0px;
+  }
+
+  .content {
+    padding-bottom: 64px;
+  }
+}
+
+/* Tablette : sidebar icônes seules / icons-only sidebar */
+@media (min-width: 640px) and (max-width: 1024px) {
+  :root {
+    --sidebar-width: 60px;
+  }
+}
+
+/* Desktop : sidebar complète / full sidebar (défaut dans :root) */
+
+/* Grilles responsive pour les détails / Responsive detail grids */
+@media (max-width: 640px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions-row {
+    flex-direction: column;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -174,4 +174,113 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
   }
+
+  /* --- Tablette : icônes seules / Tablet: icons only --- */
+  @media (min-width: 640px) and (max-width: 1024px) {
+    .sidebar {
+      width: 60px;
+    }
+
+    .sidebar-header {
+      padding: var(--space-3);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .logo-text {
+      display: none;
+    }
+
+    .status-text {
+      display: none;
+    }
+
+    .nav-item {
+      justify-content: center;
+      padding: var(--space-3);
+    }
+
+    .nav-label {
+      display: none;
+    }
+
+    .nav-badge {
+      position: absolute;
+      top: 2px;
+      right: 4px;
+      transform: scale(0.8);
+    }
+
+    .nav-item {
+      position: relative;
+    }
+  }
+
+  /* --- Mobile : barre de navigation en bas / Mobile: bottom tab bar --- */
+  @media (max-width: 639px) {
+    .sidebar {
+      width: 100%;
+      height: auto;
+      position: fixed;
+      top: auto;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      flex-direction: row;
+      border-right: none;
+      border-top: 1px solid var(--border-primary);
+      z-index: 100;
+    }
+
+    .sidebar-header {
+      display: none;
+    }
+
+    .nav-items {
+      display: flex;
+      flex-direction: row;
+      padding: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .nav-item {
+      flex: 1;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-1);
+      padding: var(--space-2) var(--space-1);
+      border-left: none;
+      margin: 0;
+      min-width: 0;
+      font-size: var(--font-size-xs);
+    }
+
+    .nav-item.active {
+      border-left-color: transparent;
+      border-bottom: 2px solid var(--accent-cyan);
+    }
+
+    .nav-label {
+      font-size: 0.65rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      text-align: center;
+    }
+
+    .nav-badge {
+      position: absolute;
+      top: 0;
+      right: 2px;
+      transform: scale(0.75);
+    }
+
+    .nav-item {
+      position: relative;
+    }
+  }
 </style>

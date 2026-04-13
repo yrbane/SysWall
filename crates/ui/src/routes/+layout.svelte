@@ -3,6 +3,8 @@
   import Sidebar from '$lib/components/ui/Sidebar.svelte';
   import ErrorBanner from '$lib/components/ui/ErrorBanner.svelte';
   import Toast from '$lib/components/ui/Toast.svelte';
+  import { page } from '$app/stores';
+  import { fade } from 'svelte/transition';
   import { fr } from '$lib/i18n/fr';
   import { firewallStatus, fetchStatus, initStatusListener, statusError } from '$lib/stores/status';
   import { initConnectionListeners, connectionCounts } from '$lib/stores/connections';
@@ -70,7 +72,11 @@
     {#if $statusError}
       <ErrorBanner message={fr.common_connection_error} onretry={fetchStatus} />
     {/if}
-    {@render children()}
+    {#key $page.url.pathname}
+      <div class="page-transition" in:fade={{ duration: 150, delay: 50 }} out:fade={{ duration: 100 }}>
+        {@render children()}
+      </div>
+    {/key}
   </main>
 
   <Toast />
@@ -91,5 +97,12 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
+  }
+
+  .page-transition {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    flex: 1;
   }
 </style>
