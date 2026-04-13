@@ -12,7 +12,7 @@ use syswall_domain::value_objects::ExecutablePath;
 use syswall_domain::value_objects::Protocol;
 
 use super::cache::ProcessCache;
-use super::proc_parser::{parse_cmdline_opt, parse_proc_net_tcp, parse_proc_net_tcp6, parse_proc_net_udp, parse_proc_status, ProcNetEntry};
+use super::proc_parser::{parse_cmdline_opt, parse_proc_net_tcp, parse_proc_net_tcp6, parse_proc_net_udp, parse_proc_status};
 
 /// Configuration for the ProcfsProcessResolver.
 /// Configuration pour le ProcfsProcessResolver.
@@ -211,24 +211,6 @@ impl ProcfsProcessResolver {
         let after_pid = &line[pid_start + 4..];
         let pid_str: String = after_pid.chars().take_while(|c| c.is_ascii_digit()).collect();
         pid_str.parse().ok().filter(|&p| p > 0)
-    }
-
-    /// Parse ss output to extract PID.
-    /// Example line: `ESTAB 0 0 192.168.1.159:443 8.8.8.8:12345 users:(("firefox",pid=1234,fd=22))`
-    fn parse_ss_output(output: &str) -> Option<u32> {
-        for line in output.lines().skip(1) {
-            // Look for pid=NNNN in the line
-            if let Some(pid_start) = line.find("pid=") {
-                let after_pid = &line[pid_start + 4..];
-                let pid_str: String = after_pid.chars().take_while(|c| c.is_ascii_digit()).collect();
-                if let Ok(pid) = pid_str.parse::<u32>() {
-                    if pid > 0 {
-                        return Some(pid);
-                    }
-                }
-            }
-        }
-        None
     }
 
     /// Find socket inode by matching a connection 5-tuple against /proc/net/tcp and /proc/net/udp.

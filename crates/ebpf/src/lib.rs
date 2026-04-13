@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use syswall_domain::entities::ProcessInfo;
 use syswall_domain::errors::DomainError;
