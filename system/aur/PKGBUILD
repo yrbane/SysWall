@@ -15,6 +15,11 @@ install=syswall.install
 
 build() {
     cd "SysWall-$pkgver"
+
+    # Réinitialiser les flags makepkg qui perturbent le linkage de libsqlite3-sys (bundled)
+    # Reset makepkg flags that break libsqlite3-sys (bundled) linking
+    unset CFLAGS CXXFLAGS LDFLAGS
+
     cargo build --release -p syswall-daemon
     cd crates/ui && npm ci && npm run build && cd src-tauri && cargo build --release && cd ../../..
 }
