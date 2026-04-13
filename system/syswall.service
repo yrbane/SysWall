@@ -10,13 +10,43 @@ User=root
 Restart=on-failure
 RestartSec=5s
 WatchdogSec=30s
+
+# --- Capacités minimales / Minimal capabilities ---
+# CAP_NET_ADMIN : gestion nftables / nftables management
+# CAP_NET_RAW   : conntrack, sockets bruts / raw sockets
+# CAP_SYS_PTRACE : lecture /proc/<pid>/ d'autres processus / read other process /proc
+# CAP_DAC_READ_SEARCH : lecture /proc/net sans restriction / unrestricted /proc/net access
+# CAP_BPF       : chargement programmes eBPF / eBPF program loading
+# CAP_PERFMON   : attachement tracepoints eBPF / eBPF tracepoint attachment
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_BPF CAP_PERFMON
 AmbientCapabilities=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_BPF CAP_PERFMON
-# Note: ProtectSystem=strict disabled because the daemon needs full
-# /proc access to resolve process ownership of network sockets.
-# The daemon runs as root with restricted capabilities instead.
+
+# --- Durcissement du système de fichiers / Filesystem hardening ---
 ProtectHome=read-only
 PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+
+# --- Restriction réseau / Network restrictions ---
+# Seules les familles d'adresses nécessaires / Only needed address families
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+# --- Restriction des appels système / System call restrictions ---
+# @system-service : ensemble de base pour les services / base set for services
+# @network-io : opérations réseau / network operations
+# bpf, perf_event_open : nécessaires pour eBPF / needed for eBPF
+SystemCallFilter=@system-service @network-io bpf perf_event_open
+SystemCallArchitectures=native
+
+# --- Divers / Miscellaneous ---
+# NoNewPrivileges=false requis pour eBPF JIT / required for eBPF JIT
+NoNewPrivileges=false
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+# --- Répertoires d'exécution / Runtime directories ---
 RuntimeDirectory=syswall
 RuntimeDirectoryMode=0755
 ReadWritePaths=/var/lib/syswall /var/log/syswall /var/run/syswall
