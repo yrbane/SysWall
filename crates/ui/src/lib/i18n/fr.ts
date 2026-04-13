@@ -118,6 +118,7 @@ export const fr = {
   learn_always_block: 'Toujours bloquer',
   learn_create_rule: 'Créer une règle',
   learn_ignore: 'Ignorer',
+  learn_waiting: 'En attente de connexion...',
   learn_queue: "File d'attente",
   learn_decision_of: 'sur',
   learn_toast: 'Nouvelle connexion détectée — Cliquez pour décider',
