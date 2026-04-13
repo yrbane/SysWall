@@ -1,5 +1,6 @@
 .superpowers/
 /target
+crates/ebpf-prog/target/
 crates/ui/node_modules/
 crates/ui/.svelte-kit/
 crates/ui/build/

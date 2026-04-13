@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tracing::info;
+use tracing::{info, warn};
 
 use syswall_app::fakes::{
     FakeConnectionMonitor, FakeFirewallEngine, FakeProcessResolver, FakeUserNotifier,
@@ -23,6 +23,7 @@ use syswall_infra::persistence::decision_repository::SqliteDecisionRepository;
 use syswall_infra::persistence::pending_decision_repository::SqlitePendingDecisionRepository;
 use syswall_infra::persistence::rule_repository::SqliteRuleRepository;
 use syswall_infra::persistence::Database;
+use syswall_ebpf::{EbpfProcessResolver, HybridProcessResolver};
 use syswall_infra::process::{ProcfsConfig, ProcfsProcessResolver};
 
 use crate::config::SysWallConfig;
@@ -78,17 +79,40 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, DomainError> {
         })?)
     };
 
-    // Process resolver -- real or fake based on config
-    // Resolveur de processus -- reel ou factice selon la configuration
+    // Résolveur de processus -- fake, ou hybrid (eBPF + procfs)
+    // Process resolver -- fake, or hybrid (eBPF + procfs)
     let process_resolver: Arc<dyn ProcessResolver> = if config.monitoring.use_fake {
         info!("Using FakeProcessResolver (use_fake = true)");
         Arc::new(FakeProcessResolver::new())
     } else {
-        info!("Using ProcfsProcessResolver");
-        Arc::new(ProcfsProcessResolver::new(ProcfsConfig {
+        let procfs = Arc::new(ProcfsProcessResolver::new(ProcfsConfig {
             cache_capacity: config.monitoring.process_cache_capacity,
             cache_ttl: Duration::from_secs(config.monitoring.process_cache_ttl_secs),
-        })?)
+        })?);
+
+        // Tente de charger eBPF, fallback silencieux vers procfs seul
+        // Try eBPF, silent fallback to procfs-only
+        let ebpf = if config.ebpf.enabled {
+            match EbpfProcessResolver::try_new() {
+                Ok(e) => {
+                    info!("Résolveur eBPF chargé avec succès");
+                    Some(e)
+                }
+                Err(e) => {
+                    warn!("eBPF indisponible, fallback vers procfs: {}", e);
+                    None
+                }
+            }
+        } else {
+            info!("eBPF désactivé par configuration");
+            None
+        };
+
+        info!(
+            "Using HybridProcessResolver (ebpf={})",
+            ebpf.is_some()
+        );
+        Arc::new(HybridProcessResolver::new(ebpf, procfs))
     };
 
     // Connection monitor -- real or fake based on config

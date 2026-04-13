@@ -15,6 +15,8 @@ pub struct SysWallConfig {
     pub monitoring: MonitoringConfig,
     pub learning: LearningConfig,
     pub ui: UiConfig,
+    #[serde(default)]
+    pub ebpf: EbpfConfig,
 }
 
 /// Daemon runtime configuration (socket, logging, watchdog).
@@ -148,6 +150,28 @@ pub struct UiConfig {
     pub refresh_interval_ms: u64,
 }
 
+/// Configuration eBPF (activation, taille du ring buffer).
+/// eBPF configuration (activation, ring buffer size).
+#[derive(Debug, Deserialize)]
+pub struct EbpfConfig {
+    /// Activer la capture eBPF des PID (fallback procfs si désactivé ou indisponible).
+    /// Enable eBPF PID capture (falls back to procfs if disabled or unavailable).
+    #[serde(default = "default_ebpf_enabled")]
+    pub enabled: bool,
+}
+
+fn default_ebpf_enabled() -> bool {
+    true
+}
+
+impl Default for EbpfConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_ebpf_enabled(),
+        }
+    }
+}
+
 impl SysWallConfig {
     /// Load config from a TOML file. Falls back to defaults if the file doesn't exist.
     /// Charge la configuration depuis un fichier TOML. Retourne une erreur si le fichier est invalide.
@@ -214,6 +238,9 @@ overflow_action = "block"
 locale = "fr"
 theme = "dark"
 refresh_interval_ms = 1000
+
+[ebpf]
+enabled = true
 "#;
 
     #[test]

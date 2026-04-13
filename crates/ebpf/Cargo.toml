@@ -1,0 +1,17 @@
+[package]
+name = "syswall-ebpf"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+syswall-domain = { path = "../domain" }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+aya = { workspace = true }
+aya-log = { workspace = true }
+dashmap = { workspace = true }
+nix = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

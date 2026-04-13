@@ -38,6 +38,9 @@ default_timeout_action = "block"
 max_pending_decisions = 50
 overflow_action = "block"
 
+[ebpf]
+enabled = true
+
 [ui]
 locale = "fr"
 theme = "dark"

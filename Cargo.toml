@@ -7,6 +7,10 @@ members = [
     "crates/proto",
     "crates/daemon",
     "crates/ui/src-tauri",
+    "crates/ebpf",
+]
+exclude = [
+    "crates/ebpf-prog",
 ]
 
 [workspace.package]
@@ -41,3 +45,6 @@ hyper-util = { version = "0.1", features = ["tokio"] }
 tower = { version = "0.5" }
 http = "1"
 http-body = "1"
+dashmap = "6"
+aya = "0.13"
+aya-log = "0.2"
