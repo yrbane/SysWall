@@ -4,6 +4,7 @@
   import Button from '$lib/components/ui/Button.svelte';
   import Modal from '$lib/components/ui/Modal.svelte';
   import EmptyState from '$lib/components/ui/EmptyState.svelte';
+  import Skeleton from '$lib/components/ui/Skeleton.svelte';
   import LoadingSpinner from '$lib/components/ui/LoadingSpinner.svelte';
   import ErrorBanner from '$lib/components/ui/ErrorBanner.svelte';
   import RuleForm from '$lib/components/rules/RuleForm.svelte';
@@ -139,9 +140,9 @@
 {/if}
 
 {#if $rulesLoading}
-  <LoadingSpinner />
+  <Skeleton lines={8} height="2.5rem" />
 {:else if sortedRules.length === 0}
-  <EmptyState message={fr.rules_no_rules} />
+  <EmptyState title={fr.rules_empty_title} description={fr.rules_empty_desc} />
 {:else}
   <div class="rules-table">
     <div class="rules-header">

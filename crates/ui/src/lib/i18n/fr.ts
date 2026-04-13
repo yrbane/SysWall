@@ -225,6 +225,14 @@ export const fr = {
   learn_no_history: 'Aucun historique',
   learn_decision_history: 'Historique des décisions',
 
+  // Empty states / États vides
+  conn_empty_title: 'Aucune connexion',
+  conn_empty_desc: 'Les connexions réseau apparaîtront ici en temps réel.',
+  rules_empty_title: 'Aucune règle',
+  rules_empty_desc: 'Créez votre première règle pour contrôler le trafic.',
+  audit_empty_title: 'Aucun événement',
+  audit_empty_desc: "Les événements d'audit apparaîtront ici.",
+
   // Common
   common_loading: 'Chargement...',
   common_error: 'Une erreur est survenue',

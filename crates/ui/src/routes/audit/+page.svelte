@@ -257,7 +257,7 @@
     </Button>
   </div>
 {:else}
-  <EmptyState message={fr.audit_no_events} />
+  <EmptyState title={fr.audit_empty_title} description={fr.audit_empty_desc} />
 {/if}
 
 <style>

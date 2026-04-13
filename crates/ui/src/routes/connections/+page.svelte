@@ -4,6 +4,7 @@
   import Button from '$lib/components/ui/Button.svelte';
   import Card from '$lib/components/ui/Card.svelte';
   import EmptyState from '$lib/components/ui/EmptyState.svelte';
+  import Skeleton from '$lib/components/ui/Skeleton.svelte';
   import Input from '$lib/components/ui/Input.svelte';
   import { convertFileSrc } from '@tauri-apps/api/core';
   import {
@@ -401,7 +402,7 @@
     </div>
   </div>
 {:else}
-  <EmptyState message={fr.conn_no_connections} />
+  <EmptyState title={fr.conn_empty_title} description={fr.conn_empty_desc} />
 {/if}
 
 <style>
