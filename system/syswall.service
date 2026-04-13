@@ -18,7 +18,8 @@ WatchdogSec=30s
 # CAP_DAC_READ_SEARCH : lecture /proc/net sans restriction / unrestricted /proc/net access
 # CAP_BPF       : chargement programmes eBPF / eBPF program loading
 # CAP_PERFMON   : attachement tracepoints eBPF / eBPF tracepoint attachment
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_BPF CAP_PERFMON
+# CAP_CHOWN     : chown du socket Unix vers le groupe syswall / chown socket to syswall group
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_BPF CAP_PERFMON CAP_CHOWN
 AmbientCapabilities=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_BPF CAP_PERFMON
 
 # --- Durcissement du système de fichiers / Filesystem hardening ---
