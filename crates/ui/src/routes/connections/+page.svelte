@@ -60,9 +60,14 @@
   const localFiltered = $derived.by(() => {
     let list = $filteredConnections;
 
-    // Application filter
+    // Application filter — "Inconnu" matche les connexions sans processus identifié
+    // Application filter — "Inconnu" matches connections with no identified process
     if (applicationFilter) {
-      list = list.filter((c) => c.process_name === applicationFilter);
+      if (applicationFilter === 'Inconnu') {
+        list = list.filter((c) => !c.process_name);
+      } else {
+        list = list.filter((c) => c.process_name === applicationFilter);
+      }
     }
 
     // Port filter (match source or destination port)
