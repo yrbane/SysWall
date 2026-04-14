@@ -13,6 +13,7 @@
   import { connectionCounts } from '$lib/stores/connections';
   import { fetchStatus, firewallStatus } from '$lib/stores/status';
   import { convertFileSrc } from '@tauri-apps/api/core';
+  import { goto } from '$app/navigation';
   import { onMount, onDestroy } from 'svelte';
 
   let refreshing = $state(false);
@@ -122,7 +123,7 @@
   <Card title={fr.dash_top_apps}>
     {#if $topApps.length > 0}
       {#each $topApps as app, i}
-        <div class="top-item">
+        <button class="top-item top-item-clickable" onclick={() => goto(`/connections?app=${encodeURIComponent(app.name)}`)}>
           <span class="rank font-mono">{i + 1}</span>
           <span class="app-icon-small">
             {#if app.icon}
@@ -133,7 +134,7 @@
           </span>
           <span class="top-item-name truncate">{app.name}</span>
           <span class="top-item-count font-mono text-cyan">{app.count}</span>
-        </div>
+        </button>
       {/each}
     {:else}
       <p class="text-secondary text-sm">{fr.dash_waiting}</p>
@@ -144,12 +145,12 @@
   <Card title={fr.dash_top_destinations}>
     {#if $topDestinations.length > 0}
       {#each $topDestinations as dest, i}
-        <div class="top-item">
+        <button class="top-item top-item-clickable" onclick={() => goto(`/connections?dest=${encodeURIComponent(dest.ip)}&port=${dest.port}`)}>
           <span class="rank font-mono">{i + 1}</span>
           <span class="top-item-name truncate font-mono">{dest.ip}<span class="text-tertiary">:{dest.port}</span></span>
           <Badge variant="cyan" label={dest.service} />
           <span class="top-item-count font-mono text-cyan">{dest.count}</span>
-        </div>
+        </button>
       {/each}
     {:else}
       <p class="text-secondary text-sm">{fr.dash_waiting}</p>
@@ -253,6 +254,22 @@
 
   .top-item:last-child {
     border-bottom: none;
+  }
+
+  .top-item-clickable {
+    background: none;
+    border: none;
+    width: 100%;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast);
+  }
+
+  .top-item-clickable:hover {
+    background: var(--bg-hover);
   }
 
   .rank {

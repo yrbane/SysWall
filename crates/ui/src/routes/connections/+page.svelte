@@ -7,6 +7,7 @@
   import Skeleton from '$lib/components/ui/Skeleton.svelte';
   import Input from '$lib/components/ui/Input.svelte';
   import { convertFileSrc } from '@tauri-apps/api/core';
+  import { page } from '$app/stores';
   import {
     filteredConnections,
     connectionFilters,
@@ -22,13 +23,19 @@
   // Expanded row
   let expandedId = $state<string | null>(null);
 
+  // Pré-remplissage depuis les query params (navigation depuis le dashboard)
+  // Pre-fill from query params (navigation from dashboard)
+  const urlApp = $page.url.searchParams.get('app') || '';
+  const urlDest = $page.url.searchParams.get('dest') || '';
+  const urlPort = $page.url.searchParams.get('port') || '';
+
   // Filters bound to the store
-  let searchValue = $state('');
+  let searchValue = $state(urlDest);
   let protocolFilter = $state('');
   let verdictFilter = $state('');
   let directionFilter = $state('');
-  let applicationFilter = $state('');
-  let portFilter = $state('');
+  let applicationFilter = $state(urlApp);
+  let portFilter = $state(urlPort);
 
   // Unique application names derived from all connections
   const uniqueApps = $derived.by(() => {
