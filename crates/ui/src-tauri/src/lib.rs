@@ -31,6 +31,7 @@ pub fn run() {
             commands::rules::toggle_rule,
             commands::decisions::list_pending_decisions,
             commands::decisions::respond_to_decision,
+            commands::process::get_process_details,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();

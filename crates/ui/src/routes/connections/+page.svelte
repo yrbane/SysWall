@@ -14,6 +14,7 @@
     connectionCounts,
     connectionList,
   } from '$lib/stores/connections';
+  import { getProcessDetails, type ProcessDetails } from '$lib/api/client';
   import type { ConnectionEvent } from '$lib/types';
 
   // Sort state
@@ -22,6 +23,29 @@
 
   // Expanded row
   let expandedId = $state<string | null>(null);
+
+  // Détails processus chargés pour la ligne étendue
+  // Process details loaded for the expanded row
+  let processDetails = $state<ProcessDetails | null>(null);
+  let processLoading = $state(false);
+  let processError = $state<string | null>(null);
+
+  async function loadProcessDetails(pid: number | undefined) {
+    if (!pid) {
+      processDetails = null;
+      return;
+    }
+    processLoading = true;
+    processError = null;
+    try {
+      processDetails = await getProcessDetails(pid);
+    } catch (e) {
+      processError = String(e);
+      processDetails = null;
+    } finally {
+      processLoading = false;
+    }
+  }
 
   // Pré-remplissage depuis les query params (navigation depuis le dashboard)
   // Pre-fill from query params (navigation from dashboard)
@@ -154,8 +178,14 @@
     }
   }
 
-  function toggleExpand(id: string) {
-    expandedId = expandedId === id ? null : id;
+  function toggleExpand(id: string, pid?: number) {
+    if (expandedId === id) {
+      expandedId = null;
+      processDetails = null;
+    } else {
+      expandedId = id;
+      loadProcessDetails(pid);
+    }
   }
 
   function verdictVariant(verdict: string): 'green' | 'red' | 'orange' | 'neutral' {
@@ -309,10 +339,10 @@
         <div
           class="table-row"
           class:expanded={expandedId === conn.id}
-          onclick={() => toggleExpand(conn.id)}
+          onclick={() => toggleExpand(conn.id, conn.pid)}
           role="button"
           tabindex="0"
-          onkeydown={(e) => e.key === 'Enter' && toggleExpand(conn.id)}
+          onkeydown={(e) => e.key === 'Enter' && toggleExpand(conn.id, conn.pid)}
         >
           <div class="td-cell truncate app-cell">
             {#if conn.icon && resolveIconSrc(conn.icon) && !brokenIcons.has(conn.id)}
@@ -407,6 +437,69 @@
                   <span class="detail-value font-mono">{conn.matched_rule || '--'}</span>
                 </div>
               </div>
+
+              <!-- Détails processus / Process details -->
+              {#if conn.pid}
+                <div class="process-details-section">
+                  <h4 class="process-details-title">Détails du processus</h4>
+                  {#if processLoading}
+                    <p class="text-secondary text-sm">Chargement...</p>
+                  {:else if processError}
+                    <p class="text-sm" style="color: var(--accent-red)">{processError}</p>
+                  {:else if processDetails}
+                    <div class="detail-grid">
+                      <div class="detail-item">
+                        <span class="detail-label">Exécutable</span>
+                        <span class="detail-value font-mono text-sm">{processDetails.exe}</span>
+                      </div>
+                      <div class="detail-item">
+                        <span class="detail-label">Ligne de commande</span>
+                        <span class="detail-value font-mono text-sm">{processDetails.cmdline || '--'}</span>
+                      </div>
+                      <div class="detail-item">
+                        <span class="detail-label">Répertoire</span>
+                        <span class="detail-value font-mono text-sm">{processDetails.cwd}</span>
+                      </div>
+                      <div class="detail-item">
+                        <span class="detail-label">Utilisateur</span>
+                        <span class="detail-value">{processDetails.user} (UID {processDetails.uid})</span>
+                      </div>
+                      <div class="detail-item">
+                        <span class="detail-label">État</span>
+                        <span class="detail-value">{processDetails.state}</span>
+                      </div>
+                      <div class="detail-item">
+                        <span class="detail-label">Threads</span>
+                        <span class="detail-value font-mono">{processDetails.threads}</span>
+                      </div>
+                      <div class="detail-item">
+                        <span class="detail-label">Mémoire RSS</span>
+                        <span class="detail-value font-mono">{(processDetails.memory_rss_kb / 1024).toFixed(1)} Mo</span>
+                      </div>
+                      <div class="detail-item">
+                        <span class="detail-label">Fichiers ouverts</span>
+                        <span class="detail-value font-mono">{processDetails.open_fds}</span>
+                      </div>
+                    </div>
+
+                    <!-- Ports ouverts par ce processus -->
+                    {#if processDetails.ports.length > 0}
+                      <h4 class="process-details-title" style="margin-top: var(--space-3)">Ports ouverts ({processDetails.ports.length})</h4>
+                      <div class="ports-table">
+                        {#each processDetails.ports as port}
+                          <div class="port-row">
+                            <Badge variant="cyan" label={port.protocol} />
+                            <span class="font-mono text-sm">:{port.local_port}</span>
+                            <span class="text-tertiary text-xs">→</span>
+                            <span class="font-mono text-xs text-secondary truncate">{port.remote}</span>
+                            <span class="text-xs text-secondary">{port.state}</span>
+                          </div>
+                        {/each}
+                      </div>
+                    {/if}
+                  {/if}
+                </div>
+              {/if}
             </Card>
           </div>
         {/if}
@@ -610,6 +703,37 @@
     font-size: var(--font-size-sm);
     color: var(--text-primary);
     word-break: break-all;
+  }
+
+  /* Section détails processus / Process details section */
+  .process-details-section {
+    margin-top: var(--space-4);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border-primary);
+  }
+
+  .process-details-title {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0 0 var(--space-3) 0;
+  }
+
+  .ports-table {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .port-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
   }
 
   /* App icon in table cell */

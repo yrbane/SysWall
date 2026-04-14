@@ -42,3 +42,33 @@ export async function listPendingDecisions(): Promise<PendingDecisionMessage[]> 
 export async function respondToDecision(input: DecisionResponse): Promise<string> {
   return invoke<string>('respond_to_decision', { input });
 }
+
+// --- Process ---
+
+export interface ProcessDetails {
+  pid: number;
+  name: string;
+  exe: string;
+  cmdline: string;
+  cwd: string;
+  user: string;
+  uid: number;
+  state: string;
+  threads: number;
+  memory_rss_kb: number;
+  open_fds: number;
+  start_time: string;
+  ports: PortInfo[];
+  environ: string[];
+}
+
+export interface PortInfo {
+  protocol: string;
+  local_port: number;
+  remote: string;
+  state: string;
+}
+
+export async function getProcessDetails(pid: number): Promise<ProcessDetails> {
+  return invoke<ProcessDetails>('get_process_details', { pid });
+}
