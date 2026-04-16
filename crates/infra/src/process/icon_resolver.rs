@@ -123,11 +123,20 @@ impl IconResolver {
         chain
     }
 
-    /// Détecte le thème d'icônes actif via gsettings ou variables d'environnement.
-    /// Detect active icon theme via gsettings or environment variables.
+    /// Détecte le thème d'icônes actif. Quand on tourne en root (daemon systemd),
+    /// gsettings ne fonctionne pas — on lit les fichiers de config GTK des utilisateurs.
+    ///
+    /// Detect active icon theme. When running as root (systemd daemon),
+    /// gsettings doesn't work — we read users' GTK config files instead.
     fn detect_active_theme() -> Option<String> {
-        // 1. Essayer gsettings (GNOME/GTK)
-        // 1. Try gsettings (GNOME/GTK)
+        // 1. Variable d'environnement explicite
+        // 1. Explicit environment variable
+        if let Ok(theme) = std::env::var("GTK_ICON_THEME") {
+            return Some(theme);
+        }
+
+        // 2. Essayer gsettings (fonctionne si session D-Bus disponible)
+        // 2. Try gsettings (works if D-Bus session is available)
         if let Ok(output) = std::process::Command::new("gsettings")
             .args(["get", "org.gnome.desktop.interface", "icon-theme"])
             .output()
@@ -137,20 +146,50 @@ impl IconResolver {
                     .trim()
                     .trim_matches('\'')
                     .to_string();
-                if !theme.is_empty() {
+                // Ignorer "Adwaita" si on est root — c'est probablement le défaut, pas le choix de l'utilisateur
+                // Ignore "Adwaita" if running as root — it's likely the default, not the user's choice
+                if !theme.is_empty() && !(theme == "Adwaita" && nix::unistd::getuid().is_root()) {
                     return Some(theme);
                 }
             }
         }
 
-        // 2. Essayer la variable d'environnement GTK_THEME
-        // 2. Try GTK_THEME environment variable
-        if let Ok(theme) = std::env::var("GTK_ICON_THEME") {
-            return Some(theme);
+        // 3. Scanner les fichiers settings.ini des utilisateurs réels (UID >= 1000)
+        //    C'est la méthode fiable quand le daemon tourne en root via systemd
+        // 3. Scan real users' settings.ini (UID >= 1000)
+        //    This is the reliable method when daemon runs as root via systemd
+        if let Ok(entries) = std::fs::read_dir("/home") {
+            for entry in entries.flatten() {
+                let settings_path = entry.path().join(".config/gtk-3.0/settings.ini");
+                if let Ok(content) = std::fs::read_to_string(&settings_path) {
+                    for line in content.lines() {
+                        if let Some(theme) = line.strip_prefix("gtk-icon-theme-name=") {
+                            let theme = theme.trim().to_string();
+                            if !theme.is_empty() {
+                                debug!("Thème d'icônes trouvé dans {}: {}", settings_path.display(), theme);
+                                return Some(theme);
+                            }
+                        }
+                    }
+                }
+                // Essayer aussi gtk-4.0
+                // Also try gtk-4.0
+                let settings_path_4 = entry.path().join(".config/gtk-4.0/settings.ini");
+                if let Ok(content) = std::fs::read_to_string(&settings_path_4) {
+                    for line in content.lines() {
+                        if let Some(theme) = line.strip_prefix("gtk-icon-theme-name=") {
+                            let theme = theme.trim().to_string();
+                            if !theme.is_empty() {
+                                return Some(theme);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        // 3. Lire ~/.config/gtk-3.0/settings.ini
-        // 3. Read ~/.config/gtk-3.0/settings.ini
+        // 4. Lire le config du processus courant (fallback)
+        // 4. Read current process config (fallback)
         if let Some(config_dir) = dirs::config_dir() {
             let settings_path = config_dir.join("gtk-3.0/settings.ini");
             if let Ok(content) = std::fs::read_to_string(settings_path) {
@@ -162,8 +201,8 @@ impl IconResolver {
             }
         }
 
-        // 4. Fallback : Adwaita (défaut GNOME)
-        // 4. Fallback: Adwaita (GNOME default)
+        // 5. Fallback : Adwaita (défaut GNOME)
+        // 5. Fallback: Adwaita (GNOME default)
         Some("Adwaita".to_string())
     }
 
