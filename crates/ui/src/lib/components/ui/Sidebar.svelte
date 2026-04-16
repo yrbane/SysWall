@@ -1,7 +1,5 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import Badge from './Badge.svelte';
-  import { fr } from '$lib/i18n/fr';
 
   interface NavItem {
     label: string;
@@ -19,51 +17,60 @@
   let { firewallEnabled, items }: Props = $props();
 
   const currentPath = $derived($page.url.pathname);
+
+  // Sépare paramètres des items principaux / Separate settings from main items
+  const mainItems = $derived(items.filter(i => i.route !== '/settings'));
+  const settingsItem = $derived(items.find(i => i.route === '/settings'));
 </script>
 
 <nav class="sidebar" aria-label="Navigation principale">
-  <div class="sidebar-header">
-    <div class="logo">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      </svg>
-      <span class="logo-text">SysWall</span>
-    </div>
-    <div class="status-indicator">
-      <span class="status-dot" class:active={firewallEnabled}></span>
-      <span class="status-text">
-        {firewallEnabled ? fr.status_active : fr.status_inactive}
-      </span>
-    </div>
+  <!-- Logo -->
+  <div class="sidebar-logo">
+    <div class="logo-icon">🛡️</div>
+    <span class="logo-text">SysWall</span>
   </div>
 
+  <!-- Navigation principale / Main navigation -->
   <div class="nav-items">
-    {#each items as item}
+    {#each mainItems as item}
       <a
         href={item.route}
         class="nav-item"
         class:active={currentPath === item.route || currentPath.startsWith(item.route + '/')}
         aria-current={currentPath === item.route ? 'page' : undefined}
       >
-        <span class="nav-icon">
-          {@html item.icon}
-        </span>
+        <span class="nav-icon">{item.icon}</span>
         <span class="nav-label">{item.label}</span>
         {#if item.badge && item.badge > 0}
-          <span class="nav-badge" class:pulsing={item.pulsing}>
-            <Badge variant="cyan" label={String(item.badge)} />
+          <span class="nav-badge" class:pulsing={item.pulsing} class:orange={item.pulsing}>
+            {item.badge}
           </span>
         {/if}
       </a>
     {/each}
   </div>
+
+  <!-- Paramètres en bas / Settings at bottom -->
+  {#if settingsItem}
+    <div class="nav-footer">
+      <a
+        href={settingsItem.route}
+        class="nav-item nav-item-settings"
+        class:active={currentPath === settingsItem.route}
+      >
+        <span class="nav-icon">{settingsItem.icon}</span>
+        <span class="nav-label">{settingsItem.label}</span>
+      </a>
+    </div>
+  {/if}
 </nav>
 
 <style>
   .sidebar {
     width: var(--sidebar-width);
     height: 100vh;
-    background: var(--bg-secondary);
+    background: var(--bg-sidebar);
+    backdrop-filter: blur(var(--glass-blur));
     border-right: 1px solid var(--border-primary);
     display: flex;
     flex-direction: column;
@@ -74,87 +81,69 @@
     z-index: 50;
   }
 
-  .sidebar-header {
-    padding: var(--space-5) var(--space-4);
-    border-bottom: 1px solid var(--border-primary);
-  }
-
-  .logo {
+  /* --- Logo --- */
+  .sidebar-logo {
+    padding: 12px 14px 16px;
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    margin-bottom: var(--space-3);
+    gap: 8px;
+  }
+
+  .logo-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
   }
 
   .logo-text {
-    font-family: var(--font-sans);
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-bold);
-    color: var(--accent-cyan);
-    letter-spacing: 0.02em;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.2px;
   }
 
-  .status-indicator {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
-
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--accent-red);
-    flex-shrink: 0;
-  }
-
-  .status-dot.active {
-    background: var(--accent-green);
-    box-shadow: var(--glow-green);
-  }
-
-  .status-text {
-    font-size: var(--font-size-xs);
-    color: var(--text-secondary);
-  }
-
+  /* --- Navigation items --- */
   .nav-items {
     flex: 1;
-    padding: var(--space-3) 0;
+    padding: 0 6px;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
   }
 
   .nav-item {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    color: var(--text-secondary);
+    gap: 9px;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
     text-decoration: none;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    border-left: 3px solid transparent;
-    transition: all var(--transition-fast);
-    margin: var(--space-1) 0;
+    font-size: 12px;
+    font-weight: 400;
+    transition: background var(--transition-fast);
   }
 
   .nav-item:hover {
     background: var(--bg-hover);
-    color: var(--text-primary);
   }
 
   .nav-item.active {
-    border-left-color: var(--accent-cyan);
-    background: var(--bg-hover);
-    color: var(--accent-cyan);
+    background: var(--accent-cyan-15);
+    color: var(--accent-blue);
+    font-weight: 500;
   }
 
   .nav-icon {
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 18px;
+    font-size: 14px;
+    text-align: center;
     flex-shrink: 0;
   }
 
@@ -163,58 +152,57 @@
   }
 
   .nav-badge {
-    flex-shrink: 0;
+    margin-left: auto;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-weight: 500;
+    font-family: var(--font-mono);
+  }
+
+  .nav-badge.orange {
+    background: var(--accent-orange);
+    color: #000;
+    font-weight: 600;
   }
 
   .nav-badge.pulsing {
-    animation: pulse 2s infinite;
+    animation: badgePulse 2s infinite;
   }
 
-  @keyframes pulse {
+  @keyframes badgePulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+    50% { opacity: 0.6; }
+  }
+
+  /* --- Footer / Settings --- */
+  .nav-footer {
+    padding: 6px;
+    border-top: 1px solid var(--border-primary);
+  }
+
+  .nav-item-settings {
+    color: var(--text-secondary);
   }
 
   /* --- Tablette : icônes seules / Tablet: icons only --- */
   @media (min-width: 640px) and (max-width: 1024px) {
-    .sidebar {
-      width: 60px;
-    }
-
-    .sidebar-header {
-      padding: var(--space-3);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .logo-text {
-      display: none;
-    }
-
-    .status-text {
-      display: none;
-    }
-
-    .nav-item {
-      justify-content: center;
-      padding: var(--space-3);
-    }
-
-    .nav-label {
-      display: none;
-    }
-
+    .sidebar { width: 56px; }
+    .sidebar-logo { padding: 12px 0; justify-content: center; }
+    .logo-text { display: none; }
+    .nav-items { padding: 0 4px; }
+    .nav-item { justify-content: center; padding: 8px; }
+    .nav-label { display: none; }
     .nav-badge {
       position: absolute;
-      top: 2px;
-      right: 4px;
+      top: 0;
+      right: 0;
       transform: scale(0.8);
     }
-
-    .nav-item {
-      position: relative;
-    }
+    .nav-item { position: relative; }
+    .nav-footer { padding: 4px; }
   }
 
   /* --- Mobile : barre de navigation en bas / Mobile: bottom tab bar --- */
@@ -231,56 +219,28 @@
       border-right: none;
       border-top: 1px solid var(--border-primary);
       z-index: 100;
+      backdrop-filter: blur(var(--glass-blur));
     }
-
-    .sidebar-header {
-      display: none;
-    }
-
+    .sidebar-logo { display: none; }
+    .nav-footer { display: none; }
     .nav-items {
-      display: flex;
       flex-direction: row;
       padding: 0;
       overflow-x: auto;
-      overflow-y: hidden;
+      gap: 0;
     }
-
     .nav-item {
       flex: 1;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: var(--space-1);
-      padding: var(--space-2) var(--space-1);
-      border-left: none;
-      margin: 0;
-      min-width: 0;
-      font-size: var(--font-size-xs);
+      gap: 2px;
+      padding: 6px 2px;
+      font-size: 9px;
+      border-radius: 0;
     }
-
     .nav-item.active {
-      border-left-color: transparent;
-      border-bottom: 2px solid var(--accent-cyan);
-    }
-
-    .nav-label {
-      font-size: 0.65rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 100%;
-      text-align: center;
-    }
-
-    .nav-badge {
-      position: absolute;
-      top: 0;
-      right: 2px;
-      transform: scale(0.75);
-    }
-
-    .nav-item {
-      position: relative;
+      border-bottom: 2px solid var(--accent-blue);
+      background: none;
     }
   }
 </style>
