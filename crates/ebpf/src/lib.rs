@@ -33,7 +33,7 @@ const BPF_PROG_BYTES: &[u8] = include_bytes!("../bpf/syswall-ebpf-prog");
 /// eBPF-based process resolver.
 /// Loads a BPF program hooking inet_sock_set_state to capture PID per socket.
 pub struct EbpfProcessResolver {
-    socket_map: Arc<SocketMap>,
+    pub(crate) socket_map: Arc<SocketMap>,
     _drain_handle: tokio::task::JoinHandle<()>,
 }
 
@@ -143,7 +143,7 @@ impl EbpfProcessResolver {
         }
     }
 
-    fn protocol_to_u8(protocol: Protocol) -> u8 {
+    pub(crate) fn protocol_to_u8(protocol: Protocol) -> u8 {
         match protocol {
             Protocol::Tcp => 6,  // IPPROTO_TCP
             Protocol::Udp => 17, // IPPROTO_UDP
@@ -200,11 +200,11 @@ impl HybridProcessResolver {
 #[async_trait]
 impl ProcessResolver for HybridProcessResolver {
     async fn resolve(&self, pid: u32) -> Result<Option<ProcessInfo>, DomainError> {
-        if let Some(ref ebpf) = self.ebpf {
-            if let Ok(Some(info)) = ebpf.resolve(pid).await {
-                return Ok(Some(info));
-            }
-        }
+        // Toujours utiliser le fallback (procfs) qui a l'IconResolver.
+        // L'eBPF est utilisé pour le lookup rapide par connection, pas pour resolve(pid).
+        //
+        // Always use the fallback (procfs) which has the IconResolver.
+        // eBPF is used for fast connection lookup, not for resolve(pid).
         self.fallback.resolve(pid).await
     }
 
@@ -220,14 +220,20 @@ impl ProcessResolver for HybridProcessResolver {
         remote_ip: IpAddr,
         remote_port: u16,
     ) -> Result<Option<ProcessInfo>, DomainError> {
-        // Essai eBPF d'abord (rapide, O(1))
-        // Try eBPF first (fast, O(1))
+        // Essai eBPF d'abord pour trouver le PID (rapide, O(1)),
+        // puis résolution complète via fallback (procfs + IconResolver)
+        //
+        // Try eBPF first to find the PID (fast, O(1)),
+        // then full resolution via fallback (procfs + IconResolver)
         if let Some(ref ebpf) = self.ebpf {
-            if let Ok(Some(info)) = ebpf
-                .resolve_by_connection(protocol, local_ip, local_port, remote_ip, remote_port)
-                .await
-            {
-                return Ok(Some(info));
+            let proto = EbpfProcessResolver::protocol_to_u8(protocol);
+            if let Some(entry) = ebpf.socket_map.get(&(proto, local_port)) {
+                let pid = *entry;
+                // Résoudre via fallback pour avoir l'icône
+                // Resolve via fallback to get the icon
+                if let Ok(Some(info)) = self.fallback.resolve(pid).await {
+                    return Ok(Some(info));
+                }
             }
         }
         // Fallback vers procfs (3-tier)
