@@ -52,9 +52,10 @@ async function openDecisionPopup(decision: PendingDecisionMessage): Promise<void
   }
 
   try {
+    console.log('[SysWall] Ouverture du popup de décision pour:', decision.id);
     const popup = new WebviewWindow('decision-popup', {
       url: '/popup/decision',
-      title: 'SysWall',
+      title: 'SysWall — Nouvelle connexion',
       width: 480,
       height: 560,
       center: true,
@@ -70,17 +71,23 @@ async function openDecisionPopup(decision: PendingDecisionMessage): Promise<void
     // Attendre que la fenêtre soit prête, puis envoyer la décision
     // Wait for window ready, then send the decision
     popup.once('tauri://created', async () => {
-      // Petit délai pour laisser le temps au listener de s'initialiser
-      // Small delay to let the listener initialize
+      console.log('[SysWall] Popup créé, envoi de la décision...');
       setTimeout(async () => {
         await emit('syswall://popup-show-decision', JSON.stringify(decision));
-      }, 200);
+      }, 300);
+    });
+
+    popup.once('tauri://error', (e) => {
+      console.error('[SysWall] Erreur popup:', e);
+      popupOpen = false;
     });
 
     popup.once('tauri://destroyed', () => {
+      console.log('[SysWall] Popup fermé');
       popupOpen = false;
     });
-  } catch {
+  } catch (e) {
+    console.error('[SysWall] Échec ouverture popup:', e);
     popupOpen = false;
   }
 }
