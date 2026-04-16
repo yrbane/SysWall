@@ -1,3 +1,5 @@
+pub mod snooper;
+
 /// DNS resolver with LRU cache for reverse IP lookups.
 /// Résolveur DNS avec cache LRU pour les recherches IP inverses.
 use std::net::IpAddr;

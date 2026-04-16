@@ -18,6 +18,7 @@ uuid = { workspace = true }
 lru = { workspace = true }
 dns-lookup = { workspace = true }
 nix = { workspace = true }
+dashmap = { workspace = true }
 dirs = "6"
 
 [features]
