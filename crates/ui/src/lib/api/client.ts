@@ -78,3 +78,9 @@ export interface PortInfo {
 export async function getProcessDetails(pid: number): Promise<ProcessDetails> {
   return invoke<ProcessDetails>('get_process_details', { pid });
 }
+
+/// Lit un fichier icône système et retourne un data URI base64.
+/// Read a system icon file and return a base64 data URI.
+export async function readIcon(path: string): Promise<string> {
+  return invoke<string>('read_icon', { path });
+}

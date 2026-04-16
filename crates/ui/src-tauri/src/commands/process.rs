@@ -183,6 +183,76 @@ fn get_process_ports(pid: u32) -> Vec<PortInfo> {
     ports
 }
 
+/// Lit un fichier icône et retourne un data URI (base64).
+/// Permet d'afficher des icônes système (ex: Papirus) dans WebKit
+/// sans avoir besoin de permissions filesystem Tauri.
+///
+/// Read an icon file and return a data URI (base64).
+/// Allows displaying system icons (e.g., Papirus) in WebKit
+/// without needing Tauri filesystem permissions.
+#[tauri::command]
+pub async fn read_icon(path: String) -> Result<String, String> {
+    let file_path = std::path::Path::new(&path);
+    if !file_path.exists() {
+        return Err("Fichier introuvable".into());
+    }
+
+    // Vérifier que c'est bien un fichier d'icône (sécurité)
+    // Verify it's an icon file (security)
+    let ext = file_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+
+    let mime = match ext {
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        "xpm" => "image/x-xpixmap",
+        _ => return Err("Format non supporté".into()),
+    };
+
+    // Vérifier que le chemin est dans un répertoire d'icônes connu (sécurité)
+    // Verify path is in a known icon directory (security)
+    let path_str = file_path.to_string_lossy();
+    if !path_str.starts_with("/usr/share/icons/")
+        && !path_str.starts_with("/usr/share/pixmaps/")
+        && !path_str.starts_with("/usr/local/share/icons/")
+    {
+        return Err("Chemin non autorisé".into());
+    }
+
+    let data = std::fs::read(file_path).map_err(|e| format!("Lecture impossible: {}", e))?;
+    let b64 = base64_encode(&data);
+
+    Ok(format!("data:{};base64,{}", mime, b64))
+}
+
+/// Encodage base64 minimal sans dépendance externe.
+/// Minimal base64 encoding without external dependency.
+fn base64_encode(data: &[u8]) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        result.push(CHARS[((triple >> 18) & 0x3F) as usize] as char);
+        result.push(CHARS[((triple >> 12) & 0x3F) as usize] as char);
+        if chunk.len() > 1 {
+            result.push(CHARS[((triple >> 6) & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(CHARS[(triple & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
+}
+
 /// Récupère l'heure de démarrage approximative du processus.
 /// Get approximate process start time.
 fn get_start_time(pid: u32) -> String {

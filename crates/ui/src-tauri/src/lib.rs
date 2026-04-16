@@ -33,6 +33,7 @@ pub fn run() {
             commands::decisions::list_pending_decisions,
             commands::decisions::respond_to_decision,
             commands::process::get_process_details,
+            commands::process::read_icon,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();

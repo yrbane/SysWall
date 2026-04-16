@@ -12,7 +12,7 @@
   } from '$lib/stores/dashboard';
   import { connectionCounts } from '$lib/stores/connections';
   import { fetchStatus, firewallStatus } from '$lib/stores/status';
-  import { convertFileSrc } from '@tauri-apps/api/core';
+  import AppIcon from '$lib/components/ui/AppIcon.svelte';
   import { goto } from '$app/navigation';
   import { onMount, onDestroy } from 'svelte';
 
@@ -125,13 +125,7 @@
       {#each $topApps as app, i}
         <button class="top-item top-item-clickable" onclick={() => goto(`/connections?app=${encodeURIComponent(app.name)}`)}>
           <span class="rank font-mono">{i + 1}</span>
-          <span class="app-icon-small">
-            {#if app.icon}
-              <img src={convertFileSrc(app.icon)} alt="" width="18" height="18" class="app-icon-img" />
-            {:else}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
-            {/if}
-          </span>
+          <AppIcon path={app.icon} size={18} />
           <span class="top-item-name truncate">{app.name}</span>
           <span class="top-item-count font-mono text-cyan">{app.count}</span>
         </button>

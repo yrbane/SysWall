@@ -6,7 +6,7 @@
   import EmptyState from '$lib/components/ui/EmptyState.svelte';
   import Skeleton from '$lib/components/ui/Skeleton.svelte';
   import Input from '$lib/components/ui/Input.svelte';
-  import { convertFileSrc } from '@tauri-apps/api/core';
+  import AppIcon from '$lib/components/ui/AppIcon.svelte';
   import { page } from '$app/stores';
   import {
     filteredConnections,
@@ -216,23 +216,6 @@
     return `${addr.ip}:${addr.port}`;
   }
 
-  // Resolve an app icon path to a displayable src URL
-  function resolveIconSrc(iconPath: string | undefined): string | null {
-    if (!iconPath) return null;
-    try {
-      return convertFileSrc(iconPath);
-    } catch {
-      return null;
-    }
-  }
-
-  // Track broken icon images to fall back to generic icon
-  let brokenIcons = $state(new Set<string>());
-
-  function handleIconError(connId: string) {
-    brokenIcons = new Set([...brokenIcons, connId]);
-  }
-
   const hasActiveFilters = $derived(
     searchValue || protocolFilter || verdictFilter || directionFilter || applicationFilter || portFilter
   );
@@ -345,22 +328,7 @@
           onkeydown={(e) => e.key === 'Enter' && toggleExpand(conn.id, conn.pid)}
         >
           <div class="td-cell truncate app-cell">
-            {#if conn.icon && resolveIconSrc(conn.icon) && !brokenIcons.has(conn.id)}
-              <img
-                class="app-icon-img"
-                src={resolveIconSrc(conn.icon)}
-                alt=""
-                width="16"
-                height="16"
-                onerror={() => handleIconError(conn.id)}
-              />
-            {:else}
-              <svg class="app-icon-fallback" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                <line x1="8" y1="21" x2="16" y2="21" />
-                <line x1="12" y1="17" x2="12" y2="21" />
-              </svg>
-            {/if}
+            <AppIcon path={conn.icon} size={16} />
             <span class="truncate">{conn.process_name || fr.conn_unknown}</span>
           </div>
           <div class="td-cell font-mono">{conn.pid || '--'}</div>
