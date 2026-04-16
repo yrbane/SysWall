@@ -35,6 +35,10 @@
 
   const currentTitle = $derived(pageTitles[$page.url.pathname] || 'SysWall');
 
+  // Masquer la sidebar et la topbar pour les routes /popup
+  // Hide sidebar and topbar for /popup routes
+  const isPopup = $derived($page.url.pathname.startsWith('/popup'));
+
   const navItems = $derived([
     { label: fr.nav_dashboard, route: '/dashboard', icon: '📊' },
     { label: fr.nav_connections, route: '/connections', icon: '🔗', badge: $connectionCounts.total },
@@ -82,40 +86,52 @@
   });
 </script>
 
-<div class="app-layout">
-  <Sidebar firewallEnabled={networkEnabled} items={navItems} />
-
-  <div class="main-area">
-    <!-- Top bar contextuelle / Contextual top bar -->
-    <header class="topbar">
-      <h1 class="topbar-title">{currentTitle}</h1>
-      <div class="topbar-spacer"></div>
-
-      <!-- Kill-switch pill -->
-      <button class="killswitch-pill" class:disabled={!networkEnabled} onclick={toggleNetwork}>
-        <span class="killswitch-dot" class:active={networkEnabled}></span>
-        <span class="killswitch-label">
-          {networkEnabled ? 'Réseau actif' : 'Réseau coupé'}
-        </span>
-      </button>
-    </header>
-
-    <main class="content">
-      {#if $statusError}
-        <ErrorBanner message={fr.common_connection_error} onretry={fetchStatus} />
-      {/if}
-      {#key $page.url.pathname}
-        <div class="page-transition" in:fade={{ duration: 150, delay: 50 }} out:fade={{ duration: 100 }}>
-          {@render children()}
-        </div>
-      {/key}
-    </main>
+{#if isPopup}
+  <!-- Layout minimal pour les popups — pas de sidebar, pas de topbar -->
+  <div class="popup-root">
+    {@render children()}
   </div>
-
   <Toast />
-</div>
+{:else}
+  <div class="app-layout">
+    <Sidebar firewallEnabled={networkEnabled} items={navItems} />
+
+    <div class="main-area">
+      <header class="topbar">
+        <h1 class="topbar-title">{currentTitle}</h1>
+        <div class="topbar-spacer"></div>
+
+        <button class="killswitch-pill" class:disabled={!networkEnabled} onclick={toggleNetwork}>
+          <span class="killswitch-dot" class:active={networkEnabled}></span>
+          <span class="killswitch-label">
+            {networkEnabled ? 'Réseau actif' : 'Réseau coupé'}
+          </span>
+        </button>
+      </header>
+
+      <main class="content">
+        {#if $statusError}
+          <ErrorBanner message={fr.common_connection_error} onretry={fetchStatus} />
+        {/if}
+        {#key $page.url.pathname}
+          <div class="page-transition" in:fade={{ duration: 150, delay: 50 }} out:fade={{ duration: 100 }}>
+            {@render children()}
+          </div>
+        {/key}
+      </main>
+    </div>
+
+    <Toast />
+  </div>
+{/if}
 
 <style>
+  .popup-root {
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-primary);
+  }
+
   .app-layout {
     display: flex;
     height: 100vh;

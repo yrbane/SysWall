@@ -6,42 +6,56 @@
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { onMount, onDestroy } from 'svelte';
   import type { PendingDecisionMessage, DomainEventPayload, DecisionAction } from '$lib/types';
-  import { addToast } from '$lib/stores/toast';
 
   let decision: PendingDecisionMessage | null = $state(null);
   let responding = $state(false);
+  let debugMsg = $state('En attente de la décision...');
   const unlisteners: (() => void)[] = [];
 
   onMount(async () => {
-    // Écoute les décisions en attente — même événement que la fenêtre principale
-    // Listen for pending decisions — same event as main window
-    const unlisten1 = await listen<DomainEventPayload>('syswall://decision-required', (event) => {
+    console.log('[Popup] Initialisé, en attente des événements...');
+
+    // Écoute l'événement direct envoyé par le store principal
+    // Listen for direct event sent by the main store
+    const unlisten1 = await listen('syswall://popup-show-decision', (event: any) => {
+      console.log('[Popup] Reçu popup-show-decision:', typeof event.payload, event.payload);
       try {
-        decision = JSON.parse(event.payload.payload_json);
-      } catch { /* ignore */ }
+        // Le payload peut être une string JSON ou un objet
+        // The payload can be a JSON string or an object
+        const data = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
+        decision = data;
+        debugMsg = `Décision reçue: ${decision?.id?.slice(0, 8)}`;
+        console.log('[Popup] Décision parsée:', decision);
+      } catch (e) {
+        console.error('[Popup] Erreur parsing:', e);
+        debugMsg = `Erreur: ${e}`;
+      }
     });
     unlisteners.push(unlisten1);
 
-    // Écoute la résolution/expiration pour fermer le popup
-    // Listen for resolution/expiry to close popup
-    const unlisten2 = await listen<DomainEventPayload>('syswall://decision-resolved', async () => {
-      decision = null;
-      await closePopup();
+    // Écoute aussi l'événement standard du daemon (au cas où)
+    // Also listen for standard daemon event (just in case)
+    const unlisten2 = await listen<DomainEventPayload>('syswall://decision-required', (event) => {
+      console.log('[Popup] Reçu decision-required:', event.payload);
+      if (!decision) {
+        try {
+          decision = JSON.parse(event.payload.payload_json);
+        } catch { /* ignore */ }
+      }
     });
     unlisteners.push(unlisten2);
 
-    const unlisten3 = await listen<DomainEventPayload>('syswall://decision-expired', async () => {
+    // Fermer le popup si la décision est résolue ou expirée
+    // Close popup if decision is resolved or expired
+    const unlisten3 = await listen('syswall://decision-resolved', async () => {
       decision = null;
       await closePopup();
     });
     unlisteners.push(unlisten3);
 
-    // Écoute aussi l'événement direct du store principal
-    // Also listen for direct event from main store
-    const unlisten4 = await listen<string>('syswall://popup-show-decision', (event) => {
-      try {
-        decision = JSON.parse(event.payload);
-      } catch { /* ignore */ }
+    const unlisten4 = await listen('syswall://decision-expired', async () => {
+      decision = null;
+      await closePopup();
     });
     unlisteners.push(unlisten4);
   });
@@ -54,7 +68,7 @@
     try {
       const win = getCurrentWindow();
       await win.close();
-    } catch { /* ignore si déjà fermé */ }
+    } catch { /* ignore si déjà fermé / ignore if already closed */ }
   }
 
   async function handleRespond(action: DecisionAction, granularity: string) {
@@ -68,7 +82,6 @@
       });
       await closePopup();
     } catch (e) {
-      addToast(String(e), 'error');
       responding = false;
     }
   }
@@ -83,14 +96,15 @@
     />
   {:else}
     <div class="popup-waiting">
-      <p class="text-secondary">{fr.learn_waiting ?? 'En attente...'}</p>
+      <div class="waiting-icon">🛡️</div>
+      <p class="waiting-text">{debugMsg}</p>
     </div>
   {/if}
 </div>
 
 <style>
   .popup-container {
-    padding: var(--space-4);
+    padding: 16px;
     height: 100vh;
     display: flex;
     flex-direction: column;
@@ -101,8 +115,20 @@
 
   .popup-waiting {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100%;
+    gap: 12px;
+  }
+
+  .waiting-icon {
+    font-size: 48px;
+    opacity: 0.3;
+  }
+
+  .waiting-text {
+    color: var(--text-secondary);
+    font-size: 13px;
   }
 </style>
