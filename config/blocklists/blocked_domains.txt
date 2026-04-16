@@ -1,0 +1,31 @@
+# SysWall — Blocklist de domaines / Domain blocklist
+# Un domaine par ligne. Les sous-domaines sont automatiquement bloqués.
+# One domain per line. Subdomains are automatically blocked.
+#
+# Sources recommandées / Recommended sources:
+# - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+# - https://adaway.org/hosts.txt
+# - https://pgl.yoyo.org/adservers/serverlist.php?hostformat=plain
+
+# Trackers publicitaires / Ad trackers
+doubleclick.net
+googleadservices.com
+googlesyndication.com
+adservice.google.com
+pagead2.googlesyndication.com
+
+# Trackers analytics
+analytics.google.com
+google-analytics.com
+
+# Trackers réseaux sociaux / Social media trackers
+connect.facebook.net
+pixel.facebook.com
+ads.twitter.com
+ads.linkedin.com
+
+# Telemetrie / Telemetry
+telemetry.mozilla.org
+data.microsoft.com
+settings-win.data.microsoft.com
+vortex.data.microsoft.com

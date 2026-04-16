@@ -25,3 +25,4 @@ integration = []
 
 [dev-dependencies]
 tokio = { workspace = true }
+tempfile = "3"

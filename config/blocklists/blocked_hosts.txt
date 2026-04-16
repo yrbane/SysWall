@@ -1,0 +1,6 @@
+# SysWall — Blocklist d'adresses IP / IP blocklist
+# Une adresse IP par ligne (IPv4 ou IPv6).
+# One IP address per line (IPv4 or IPv6).
+#
+# Ajoutez ici les IP à bloquer manuellement.
+# Add IPs to block manually here.

@@ -3,7 +3,7 @@ use futures::Stream;
 use std::net::IpAddr;
 use std::pin::Pin;
 
-use crate::entities::{Connection, ProcessInfo, Rule, RuleId};
+use crate::entities::{Blocklist, Connection, ProcessInfo, Rule, RuleId};
 use crate::errors::DomainError;
 use crate::events::FirewallStatus;
 
@@ -73,4 +73,17 @@ pub trait ProcessResolver: Send + Sync {
     ) -> Result<Option<ProcessInfo>, DomainError> {
         Ok(None)
     }
+}
+
+/// Vérifie si un domaine ou une IP est dans une blocklist.
+/// Checks if a domain or IP is in a blocklist.
+pub trait BlocklistChecker: Send + Sync {
+    /// Vérifie si le domaine est bloqué. / Check if domain is blocked.
+    fn is_blocked_domain(&self, domain: &str) -> bool;
+    /// Vérifie si l'IP est bloquée. / Check if IP is blocked.
+    fn is_blocked_ip(&self, ip: IpAddr) -> bool;
+    /// Retourne la liste des blocklists chargées. / Return loaded blocklists.
+    fn list_blocklists(&self) -> Vec<Blocklist>;
+    /// Recharge les blocklists depuis le disque. / Reload blocklists from disk.
+    fn reload(&self) -> Result<(), DomainError>;
 }
