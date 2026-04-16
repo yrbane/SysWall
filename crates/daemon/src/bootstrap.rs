@@ -59,10 +59,18 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, DomainError> {
     let decision_repo = Arc::new(SqliteDecisionRepository::new(db.clone()));
     let audit_repo = Arc::new(SqliteAuditRepository::new(db.clone()));
 
-    // Event bus
-    let event_bus = Arc::new(TokioBroadcastEventBus::new(
-        config.monitoring.event_bus_capacity,
-    ));
+    // Event bus (avec fusion optionnelle des événements ConnectionDetected)
+    // Event bus (with optional ConnectionDetected event merging)
+    let event_bus = if config.monitoring.event_merge_window_ms > 0 {
+        Arc::new(TokioBroadcastEventBus::with_merge_window(
+            config.monitoring.event_bus_capacity,
+            Duration::from_millis(config.monitoring.event_merge_window_ms),
+        ))
+    } else {
+        Arc::new(TokioBroadcastEventBus::new(
+            config.monitoring.event_bus_capacity,
+        ))
+    };
 
     // Firewall engine -- real or fake based on config
     // Moteur de pare-feu -- reel ou factice selon la configuration

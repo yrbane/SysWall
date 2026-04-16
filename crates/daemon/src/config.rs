@@ -107,6 +107,14 @@ pub struct MonitoringConfig {
     pub dns_cache_ttl_secs: u64,
     #[serde(default)]
     pub use_fake: bool,
+    /// Fenêtre de fusion des événements ConnectionDetected (ms). 0 = désactivé.
+    /// Merge window for ConnectionDetected events (ms). 0 = disabled.
+    #[serde(default = "default_event_merge_window")]
+    pub event_merge_window_ms: u64,
+}
+
+fn default_event_merge_window() -> u64 {
+    100
 }
 
 fn default_cache_capacity() -> usize {

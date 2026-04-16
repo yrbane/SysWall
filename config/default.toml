@@ -29,6 +29,7 @@ event_bus_capacity = 4096
 conntrack_binary_path = "/usr/sbin/conntrack"
 conntrack_protocols = ["tcp", "udp"]
 use_fake = false
+event_merge_window_ms = 100
 
 [learning]
 enabled = true
