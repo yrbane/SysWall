@@ -16,7 +16,7 @@ use syswall_proto::syswall::{
     AuditLogRequest, AuditLogResponse, CreateRuleRequest, DashboardStatsRequest,
     DashboardStatsResponse, DecisionAck, DecisionResponseRequest, Empty, ExportAuditLogRequest,
     ExportAuditLogResponse, PendingDecisionListResponse, RuleFiltersRequest, RuleIdRequest,
-    RuleListResponse, RuleResponse, StatusResponse, ToggleRuleRequest,
+    RuleListResponse, RuleResponse, SetNetworkEnabledRequest, StatusResponse, ToggleRuleRequest,
 };
 
 use super::converters::{
@@ -313,5 +313,26 @@ impl SysWallControl for SysWallControlService {
             data,
             content_type: "application/json".to_string(),
         }))
+    }
+
+    async fn set_network_enabled(
+        &self,
+        request: Request<SetNetworkEnabledRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        let req = request.into_inner();
+
+        if req.enabled {
+            self.firewall
+                .remove_drop_all()
+                .await
+                .map_err(domain_error_to_status)?;
+        } else {
+            self.firewall
+                .drop_all()
+                .await
+                .map_err(domain_error_to_status)?;
+        }
+
+        Ok(Response::new(Empty {}))
     }
 }

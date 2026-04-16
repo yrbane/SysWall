@@ -20,6 +20,18 @@ pub trait FirewallEngine: Send + Sync {
     async fn remove_rule(&self, rule_id: &RuleId) -> Result<(), DomainError>;
     async fn sync_all_rules(&self, rules: &[Rule]) -> Result<(), DomainError>;
     async fn get_status(&self) -> Result<FirewallStatus, DomainError>;
+
+    /// Coupe tout le trafic réseau (kill-switch).
+    /// Cut all network traffic (kill-switch).
+    async fn drop_all(&self) -> Result<(), DomainError> {
+        Err(DomainError::Infrastructure("drop_all not supported".into()))
+    }
+
+    /// Rétablit le trafic réseau après un kill-switch.
+    /// Restore network traffic after kill-switch.
+    async fn remove_drop_all(&self) -> Result<(), DomainError> {
+        Err(DomainError::Infrastructure("remove_drop_all not supported".into()))
+    }
 }
 
 /// Adapter for monitoring network connections (e.g., conntrack).

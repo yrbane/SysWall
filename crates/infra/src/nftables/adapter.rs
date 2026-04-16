@@ -190,6 +190,44 @@ impl NftablesFirewallAdapter {
 
 #[async_trait]
 impl FirewallEngine for NftablesFirewallAdapter {
+
+    async fn drop_all(&self) -> Result<(), DomainError> {
+        for chain in &["output", "input"] {
+            let cmd = NftCommandBuilder::add_rule(&self.config.table_name, chain)
+                .arg("drop")
+                .arg("comment")
+                .arg("\"syswall-killswitch\"");
+            self.execute_nft(&cmd).await?;
+        }
+        info!("Kill-switch activé : tout le trafic est bloqué");
+        Ok(())
+    }
+
+    async fn remove_drop_all(&self) -> Result<(), DomainError> {
+        let list_cmd_with_handles = NftCommandBuilder::new()
+            .arg("list")
+            .arg("table")
+            .arg("inet")
+            .arg(&self.config.table_name)
+            .arg("-a");
+        let output = self.execute_nft(&list_cmd_with_handles).await.unwrap_or_default();
+
+        for line in output.lines() {
+            if line.contains("syswall-killswitch") {
+                if let Some(handle_str) = line.rsplit("handle ").next() {
+                    if let Ok(handle) = handle_str.trim().parse::<u64>() {
+                        let chain = if line.contains("output") { "output" } else { "input" };
+                        let del_cmd = NftCommandBuilder::delete_rule(
+                            &self.config.table_name, chain, handle,
+                        );
+                        let _ = self.execute_nft(&del_cmd).await;
+                    }
+                }
+            }
+        }
+        info!("Kill-switch désactivé : trafic rétabli");
+        Ok(())
+    }
     /// Apply a single rule to nftables.
     /// Applique une seule regle a nftables.
     async fn apply_rule(&self, rule: &Rule) -> Result<(), DomainError> {

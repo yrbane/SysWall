@@ -16,6 +16,21 @@ pub struct StatusResult {
     pub version: String,
 }
 
+/// Set network enabled/disabled (kill-switch).
+/// Active/désactive le réseau (kill-switch).
+#[tauri::command]
+pub async fn set_network_enabled(state: State<'_, GrpcState>, enabled: bool) -> Result<(), String> {
+    let mut client = state.get_client().await?;
+
+    client
+        .control
+        .set_network_enabled(syswall_proto::syswall::SetNetworkEnabledRequest { enabled })
+        .await
+        .map_err(|e| format!("gRPC error: {}", e))?;
+
+    Ok(())
+}
+
 /// Get the current firewall status from the daemon.
 #[tauri::command]
 pub async fn get_status(state: State<'_, GrpcState>) -> Result<StatusResult, String> {

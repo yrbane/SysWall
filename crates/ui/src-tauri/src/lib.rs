@@ -25,6 +25,7 @@ pub fn run() {
         .manage(grpc_state)
         .invoke_handler(tauri::generate_handler![
             commands::status::get_status,
+            commands::status::set_network_enabled,
             commands::rules::list_rules,
             commands::rules::create_rule,
             commands::rules::delete_rule,

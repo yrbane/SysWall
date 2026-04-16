@@ -43,6 +43,12 @@ export async function respondToDecision(input: DecisionResponse): Promise<string
   return invoke<string>('respond_to_decision', { input });
 }
 
+// --- Network ---
+
+export async function setNetworkEnabled(enabled: boolean): Promise<void> {
+  return invoke<void>('set_network_enabled', { enabled });
+}
+
 // --- Process ---
 
 export interface ProcessDetails {
