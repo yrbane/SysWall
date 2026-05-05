@@ -259,6 +259,28 @@ EN:
 - **Strict UI CSP**: the Tauri window enforces a strict Content Security Policy with no `unsafe-eval`.
 - **gRPC limits**: 1 MiB max decoded message size, 4 MiB max encode, 64 concurrent streams per connection, 30 s timeout.
 
+### Blocage actif (NFQUEUE) / Active blocking (V0.2)
+
+- **Premier paquet retenu** : chaque nouveau flux sortant est suspendu cote kernel (`nfnetlink_queue`) jusqu'a ce qu'une regle existante l'autorise/refuse, ou que l'utilisateur reponde au popup.
+- **Deduplication integree** : un seul popup par `(app, remote_ip, remote_port, protocol)` ; tous les paquets suivants attendent la meme decision via `VerdictBroadcasts`.
+- **Fail-open** : `bypass` dans la regle nft `queue num 0 bypass` — si le demon meurt ou ne consomme plus la queue, le kernel laisse passer le paquet. Internet n'est jamais coupe par un bug du daemon.
+- **Mode degrade** : si NFQUEUE ne peut pas etre ouvert (pas de `CAP_NET_ADMIN`, kernel sans `nfnetlink_queue`), le demon demarre en observation-only et journalise un evenement `Severity::Error, Category::System`.
+- **Configuration** :
+  ```toml
+  [nfqueue]
+  enabled = true
+  queue_num = 0
+  max_queued = 1024
+  overflow_policy = "block"   # ou "accept"
+  ```
+
+EN:
+
+- **First packet held**: every new outbound flow is suspended kernel-side (`nfnetlink_queue`) until either an existing rule provides a verdict or the user resolves the popup.
+- **Built-in deduplication**: one popup per `(app, remote_ip, remote_port, protocol)`; subsequent packets wait on the same decision via `VerdictBroadcasts`.
+- **Fail-open**: `bypass` in the nft `queue num 0 bypass` rule — if the daemon dies or stops consuming, the kernel lets the packet through. Internet is never cut by a daemon bug.
+- **Degraded mode**: if NFQUEUE cannot be opened (no `CAP_NET_ADMIN`, kernel without `nfnetlink_queue`), the daemon starts in observation-only and journals a `Severity::Error, Category::System` event.
+
 ---
 
 Le service systemd est durci avec des restrictions strictes :

@@ -47,3 +47,16 @@ All notable changes documented here.
 - **CI** : `cargo clippy --workspace --exclude ui --all-targets -- -D warnings` est maintenant un gate obligatoire.
 - **24 warnings clippy `infra`** : tous corriges.
 - **21 warnings clippy `daemon`** pre-existants : tous corriges.
+
+### Active Blocking (NFQUEUE)
+
+- **Nouveau port `PacketInterceptor`** + adapter `NfqueueInterceptor` (`crates/infra/src/nfqueue/`) : intercepte le premier paquet de chaque nouveau flux sortant via `nfnetlink_queue` et synchronise le verdict avec la decision utilisateur.
+- **`LearningService` implemente `PacketDecisionHandler`** : evalue via `PolicyEngine`, gere la creation de `PendingDecision`, et attend (≤ 28 s) le verdict via `VerdictBroadcasts`.
+- **Deduplication baked-in** : un seul popup par `(app, remote_ip, remote_port, protocol)` meme sous burst.
+- **Regle nft `interception`** : `iif lo accept` puis `ct state new queue num 0 bypass` ajoutee au boot.
+- **Mode degrade** : daemon demarre meme si NFQUEUE echoue.
+- **Config `[nfqueue]`** : `enabled`, `queue_num`, `max_queued`, `overflow_policy`.
+- **Limite documentee** : timeout 28 s par decision (kernel jette a 30 s) ; audit `Severity::Warning, Category::Decision` sur expiration.
+- **Smoke test** gate par `SYSWALL_TEST_NFQUEUE` dans `crates/daemon/tests/nfqueue_smoke_test.rs`.
+
+Dependances Cargo ajoutees : `nfq = "0.2.5"`, `etherparse = "0.20"` (workspace, dans `crates/infra/Cargo.toml`).
