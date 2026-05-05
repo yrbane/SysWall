@@ -103,8 +103,9 @@
     onrespond(action, granularity);
   }
 
-  // Raccourcis clavier : a=autoriser, b=bloquer, i/Esc=ignorer, Shift pour permanent
-  // Keyboard shortcuts: a=allow, b=block, i/Esc=ignore, Shift for permanent
+  // Raccourcis clavier : a=autoriser, b=bloquer, i=ignorer, Esc=defer 5min, Shift pour permanent
+  // Keyboard shortcuts: a=allow, b=block, i=ignore, Esc=defer 5min, Shift for permanent
+  const DEFER_DEFAULT_SECS = 300; // 5 minutes
   function onKeydown(e: KeyboardEvent) {
     if (
       e.target instanceof HTMLInputElement ||
@@ -125,8 +126,13 @@
         e.preventDefault();
         break;
       case 'i':
-      case 'escape':
         handleAction('ignore');
+        e.preventDefault();
+        break;
+      case 'escape':
+        // Defer : reporte la decision pour 5 min sans drop le flux durablement.
+        // Defer: snooze the decision for 5 min without permanently dropping the flow.
+        handleAction(`defer:${DEFER_DEFAULT_SECS}`);
         e.preventDefault();
         break;
     }

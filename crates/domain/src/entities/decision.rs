@@ -93,6 +93,14 @@ impl DecisionId {
 
 /// What the user decided to do.
 /// Ce que l'utilisateur a décidé de faire.
+///
+/// `Defer` reporte la décision : le paquet courant est jeté, la `dedup_key`
+/// est mise en sourdine pour `duration_secs` (les nouveaux flux matchant
+/// retombent sur Drop sans popup), puis la décision se re-déclenche.
+///
+/// `Defer` snoozes the decision: the current packet is dropped, the
+/// `dedup_key` is silenced for `duration_secs` (new matching flows fall back
+/// to Drop without a popup), then the decision re-triggers afterwards.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DecisionAction {
     AllowOnce,
@@ -101,6 +109,7 @@ pub enum DecisionAction {
     AlwaysBlock,
     CreateRule,
     Ignore,
+    Defer { duration_secs: u64 },
 }
 
 /// Granularity of the rule generated from a decision.

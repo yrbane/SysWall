@@ -89,8 +89,19 @@ pub(super) fn parse_decision_action(s: &str) -> Result<DecisionAction, tonic::St
         "always_block" => Ok(DecisionAction::AlwaysBlock),
         "create_rule" => Ok(DecisionAction::CreateRule),
         "ignore" => Ok(DecisionAction::Ignore),
+        // Defer prend un suffixe de duree obligatoire : "defer:300" pour 5 minutes.
+        // Defer requires a mandatory duration suffix: "defer:300" for 5 minutes.
+        other if other.starts_with("defer:") => {
+            let duration = other.strip_prefix("defer:")
+                .and_then(|d| d.parse::<u64>().ok())
+                .filter(|&d| d > 0 && d <= 86_400)
+                .ok_or_else(|| tonic::Status::invalid_argument(
+                    "Defer requires a positive duration in seconds (max 86400): 'defer:N'".to_string()
+                ))?;
+            Ok(DecisionAction::Defer { duration_secs: duration })
+        }
         _ => Err(tonic::Status::invalid_argument(format!(
-            "Unknown decision action: '{}'. Expected: allow_once, block_once, always_allow, always_block, create_rule, ignore",
+            "Unknown decision action: '{}'. Expected: allow_once, block_once, always_allow, always_block, create_rule, ignore, defer:N",
             s
         ))),
     }
@@ -167,6 +178,21 @@ mod tests {
             DecisionAction::Ignore
         );
         assert!(parse_decision_action("bad").is_err());
+
+        // Defer requiert un suffixe duree.
+        assert!(parse_decision_action("defer").is_err());
+        assert!(parse_decision_action("defer:").is_err());
+        assert!(parse_decision_action("defer:0").is_err());
+        assert!(parse_decision_action("defer:abc").is_err());
+        assert!(parse_decision_action("defer:99999").is_err()); // > 86400s max
+        assert_eq!(
+            parse_decision_action("defer:300").unwrap(),
+            DecisionAction::Defer { duration_secs: 300 }
+        );
+        assert_eq!(
+            parse_decision_action("defer:86400").unwrap(),
+            DecisionAction::Defer { duration_secs: 86400 }
+        );
     }
 
     #[test]

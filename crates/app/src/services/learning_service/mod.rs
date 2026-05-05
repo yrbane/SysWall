@@ -106,6 +106,9 @@ pub struct LearningService {
     default_policy: DefaultPolicy,
     verdict_broadcasts: Arc<VerdictBroadcasts>,
     config: LearningConfig,
+    /// Map en memoire dedup_key -> deadline d'expiration du snooze (Defer).
+    /// In-memory map dedup_key -> snooze expiry deadline (Defer).
+    snoozes: Arc<tokio::sync::Mutex<std::collections::HashMap<String, chrono::DateTime<Utc>>>>,
 }
 
 impl LearningService {
@@ -131,7 +134,26 @@ impl LearningService {
             default_policy,
             verdict_broadcasts,
             config,
+            snoozes: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
         }
+    }
+
+    /// Verifie si une dedup_key est en sourdine ; nettoie les sourdines expirees au passage.
+    /// Checks if a dedup_key is snoozed; cleans up expired snoozes opportunistically.
+    async fn is_snoozed(&self, dedup_key: &str) -> bool {
+        let now = Utc::now();
+        let mut map = self.snoozes.lock().await;
+        // Cleanup paresseux des entrees expirees pour ne pas faire grossir la map.
+        // Lazy cleanup of expired entries to keep the map bounded.
+        map.retain(|_, deadline| *deadline > now);
+        map.contains_key(dedup_key)
+    }
+
+    /// Ajoute une dedup_key en sourdine pour `duration_secs`.
+    /// Adds a dedup_key to the snooze map for `duration_secs`.
+    async fn snooze_dedup_key(&self, dedup_key: String, duration_secs: u64) {
+        let deadline = Utc::now() + Duration::seconds(duration_secs as i64);
+        self.snoozes.lock().await.insert(dedup_key, deadline);
     }
 
     /// Compute deduplication key from a connection snapshot.
@@ -233,6 +255,27 @@ impl LearningService {
                 PacketVerdict::Drop
             }
             DecisionAction::CreateRule => PacketVerdict::Accept,
+            DecisionAction::Defer { duration_secs } => {
+                // Snooze la dedup_key : les nouveaux flux matchant tomberont sur Drop
+                // sans repopper jusqu'a expiration.
+                // Snooze the dedup_key: new matching flows will fall to Drop without
+                // repopping until the deadline.
+                self.snooze_dedup_key(pending.deduplication_key.clone(), duration_secs)
+                    .await;
+                let event = AuditEvent::new(
+                    Severity::Info,
+                    EventCategory::Decision,
+                    format!(
+                        "decision deferred: dedup_key snoozed for {}s",
+                        duration_secs
+                    ),
+                )
+                .with_metadata("decision_id", cmd.pending_decision_id.as_uuid().to_string())
+                .with_metadata("dedup_key", pending.deduplication_key.clone())
+                .with_metadata("duration_secs", duration_secs.to_string());
+                let _ = self.audit_repo.append(&event).await;
+                PacketVerdict::Drop
+            }
         };
         self.verdict_broadcasts
             .publish_and_remove(cmd.pending_decision_id, verdict)
@@ -332,6 +375,19 @@ impl LearningService {
 
         let snapshot = conn.snapshot();
         let dedup_key = Self::dedup_key(&snapshot);
+
+        // Snooze (Defer) : si la dedup_key est en sourdine, Drop sans popup.
+        // Snooze (Defer): if the dedup_key is snoozed, Drop without popping.
+        if self.is_snoozed(&dedup_key).await {
+            let event = AuditEvent::new(
+                Severity::Info,
+                EventCategory::Decision,
+                "flow dropped: dedup_key snoozed (Defer active)",
+            )
+            .with_metadata("dedup_key", dedup_key.clone());
+            let _ = self.audit_repo.append(&event).await;
+            return Ok(PacketVerdict::Drop);
+        }
 
         // Debounce : réutilise une PendingDecision encore active.
         // Debounce: re-use an existing active PendingDecision.
@@ -842,5 +898,56 @@ mod handler_tests {
 
         let verdict = task.await.unwrap().unwrap();
         assert_eq!(verdict, PacketVerdict::Drop);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn defer_snoozes_dedup_key_and_drops_subsequent_flows() {
+        let (service, pending_repo, audit) = make_service(vec![], DefaultPolicy::Ask);
+        let conn = dummy_connection();
+
+        // 1er flux : declenche une PendingDecision et attend.
+        // First flow: triggers a PendingDecision and waits.
+        let s1 = service.clone();
+        let c1 = conn.clone();
+        let task = tokio::spawn(async move { s1.decide(&c1).await });
+        tokio::task::yield_now().await;
+        tokio::time::sleep(Duration::from_millis(1)).await;
+
+        let pds = pending_repo.snapshot_pending().await;
+        let pd = pds.into_iter().next().expect("PendingDecision devrait exister");
+
+        // L'utilisateur differe pour 60 secondes.
+        // User defers for 60 seconds.
+        let cmd = RespondToDecisionCommand {
+            pending_decision_id: pd.id,
+            action: DecisionAction::Defer { duration_secs: 60 },
+            granularity: DecisionGranularity::AppOnly,
+        };
+        service.resolve_decision(cmd).await.unwrap();
+
+        // Le 1er flux recoit Drop.
+        // First flow gets Drop.
+        let v1 = task.await.unwrap().unwrap();
+        assert_eq!(v1, PacketVerdict::Drop);
+
+        // Un nouveau flux avec la meme dedup_key tombe sur Drop SANS creer de nouvelle pending.
+        // A new flow with the same dedup_key falls to Drop WITHOUT creating a new pending.
+        let v2 = service.decide(&conn).await.unwrap();
+        assert_eq!(v2, PacketVerdict::Drop);
+
+        // Verifie qu'aucune nouvelle pending n'a ete creee (dedup_key snoozed).
+        let new_pds = pending_repo.snapshot_pending().await;
+        assert_eq!(new_pds.len(), 0, "snooze doit empecher la creation d'une nouvelle pending");
+
+        // Audit log doit contenir les deux events Defer.
+        let events = audit.snapshot().await;
+        assert!(
+            events.iter().any(|e| e.description.contains("decision deferred")),
+            "audit doit contenir l'event resolve Defer"
+        );
+        assert!(
+            events.iter().any(|e| e.description.contains("dedup_key snoozed")),
+            "audit doit contenir l'event drop sur snooze actif"
+        );
     }
 }
