@@ -87,3 +87,21 @@ Nouveaux utilitaires : `crates/ui/src/lib/utils/debounce.ts`, `crates/ui/src/lib
 - **Card** : prop `glow` retiree (YAGNI).
 - **Pulsation killswitch** : 2 s ease-in-out cyan quand le reseau est actif. Desactivee sous `prefers-reduced-motion: reduce`.
 - **Tokens** : `--accent-syswall`, `--accent-syswall-dim`, `--accent-syswall-glow`, `--bg-row-hover`, `--bg-row-stripe`, `--shadow-sticky-header`.
+
+### Config cablage (sous-projet C.1)
+
+Cinq champs config TOML auparavant signales `never read` par le compilateur sont desormais utilises :
+
+- **`daemon.watchdog_interval_secs`** : envoi periodique de `sd_notify(WATCHDOG=1)` a systemd. Si `NOTIFY_SOCKET` est absent (lance hors systemd), no-op silencieux. Frequence d'envoi = `interval_secs / 2` (recommandation systemd).
+- **`database.journal_retention_days`** : tache de rotation tokio quotidienne qui supprime les `audit_events` anterieurs a `Utc::now() - retention_days`. `0` desactive la rotation. Nouvelle methode `AuditRepository::delete_before(cutoff)`.
+- **`learning.enabled`** : `false` desactive completement la creation de `PendingDecision` ; les flux sans regle retombent sur `default_policy`.
+- **`learning.default_timeout_action`** : action appliquee apres expiration d'un verdict NFQUEUE (`"allow"` ou `"block"`, defaut `"block"`).
+- **`learning.overflow_action`** : action appliquee quand `max_pending_decisions` est atteint (`"allow"` ou `"block"`, defaut `"block"`). Audit `Severity::Warning, Category::Decision` sur saturation.
+
+Trois champs supprimes (YAGNI — sans valeur ajoutee) :
+
+- `daemon.log_dir` (gere par systemd `LogsDirectory=syswall` + journald).
+- `ui.theme` (SysWall est dark-only par design).
+- `ui.refresh_interval_ms` (l'UI utilise des streams gRPC, pas du polling).
+
+Nouvelle dependance Cargo : `sd-notify = "0.4"` (UnixDatagram raw, pas de -lsystemd requis).
