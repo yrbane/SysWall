@@ -4,6 +4,7 @@
 pub mod control_service;
 pub mod converters;
 pub mod event_service;
+pub mod interceptors;
 pub mod server;
 
 pub use control_service::SysWallControlService;
