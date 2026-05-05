@@ -1,6 +1,9 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import SyswallLogo from '$lib/components/branding/SyswallLogo.svelte';
+  import { LayoutDashboard, Network, Shield, BrainCircuit, Ban, ClipboardList, Settings } from 'lucide-svelte';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type IconComponent = any;
 
   interface NavItem {
     label: string;
@@ -22,6 +25,21 @@
   // Sépare paramètres des items principaux / Separate settings from main items
   const mainItems = $derived(items.filter(i => i.route !== '/settings'));
   const settingsItem = $derived(items.find(i => i.route === '/settings'));
+
+  // Table de correspondance route → composant Lucide / Route to Lucide component map
+  const iconMap: Record<string, IconComponent> = {
+    '/dashboard': LayoutDashboard,
+    '/connections': Network,
+    '/rules': Shield,
+    '/learning': BrainCircuit,
+    '/blocklists': Ban,
+    '/audit': ClipboardList,
+    '/settings': Settings,
+  };
+
+  function getIcon(route: string): IconComponent {
+    return iconMap[route] ?? Shield;
+  }
 </script>
 
 <nav class="sidebar" aria-label="Navigation principale">
@@ -33,13 +51,16 @@
   <!-- Navigation principale / Main navigation -->
   <div class="nav-items">
     {#each mainItems as item}
+      {@const IconComponent = getIcon(item.route)}
       <a
         href={item.route}
         class="nav-item"
         class:active={currentPath === item.route || currentPath.startsWith(item.route + '/')}
         aria-current={currentPath === item.route ? 'page' : undefined}
       >
-        <span class="nav-icon">{item.icon}</span>
+        <span class="nav-icon">
+          <IconComponent size={16} strokeWidth={1.75} />
+        </span>
         <span class="nav-label">{item.label}</span>
         {#if item.badge && item.badge > 0}
           <span class="nav-badge" class:pulsing={item.pulsing} class:orange={item.pulsing}>
@@ -52,13 +73,16 @@
 
   <!-- Paramètres en bas / Settings at bottom -->
   {#if settingsItem}
+    {@const SettingsIcon = getIcon(settingsItem.route)}
     <div class="nav-footer">
       <a
         href={settingsItem.route}
         class="nav-item nav-item-settings"
         class:active={currentPath === settingsItem.route}
       >
-        <span class="nav-icon">{settingsItem.icon}</span>
+        <span class="nav-icon">
+          <SettingsIcon size={16} strokeWidth={1.75} />
+        </span>
         <span class="nav-label">{settingsItem.label}</span>
       </a>
     </div>
@@ -129,9 +153,16 @@
 
   .nav-icon {
     width: 18px;
-    font-size: 14px;
-    text-align: center;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
+  }
+
+  /* Héritage de couleur pour les icônes Lucide / Lucide icons inherit color */
+  .nav-icon :global(svg) {
+    color: inherit;
   }
 
   .nav-label {
@@ -178,7 +209,6 @@
   @media (min-width: 640px) and (max-width: 1024px) {
     .sidebar { width: 56px; }
     .sidebar-logo { padding: 12px 0; justify-content: center; }
-    .logo-text { display: none; }
     .nav-items { padding: 0 4px; }
     .nav-item { justify-content: center; padding: 8px; }
     .nav-label { display: none; }
