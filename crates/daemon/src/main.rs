@@ -53,8 +53,7 @@ async fn run() -> Result<(), StartupError> {
         .map_err(|e| StartupError::ConfigInvalid(e.to_string()))?;
 
     // Assemble le contexte applicatif (DB, repos, services, moniteurs)
-    let ctx = bootstrap::bootstrap(&config)
-        .map_err(|e| StartupError::InfrastructureInit(e.to_string()))?;
+    let ctx = bootstrap::bootstrap(&config)?;
 
     // Create system whitelist if first start
     if let Err(e) = syswall_app::services::whitelist::ensure_system_whitelist(

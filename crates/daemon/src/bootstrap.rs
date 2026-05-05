@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -6,15 +7,17 @@ use tracing::{info, warn};
 use syswall_app::fakes::{
     FakeConnectionMonitor, FakeFirewallEngine, FakeProcessResolver, FakeUserNotifier,
 };
+use syswall_app::services::antilockout_guard::{AntilockoutConfig as GuardConfig, AntilockoutGuard};
 use syswall_app::services::audit_service::AuditService;
 use syswall_app::services::connection_service::ConnectionService;
 use syswall_app::services::learning_service::{
     LearningConfig as AppLearningConfig, LearningService,
 };
 use syswall_app::services::rule_service::RuleService;
-use syswall_domain::errors::DomainError;
+use syswall_domain::ports::connectivity::LockoutGuard;
 use syswall_domain::ports::{ConnectionMonitor, FirewallEngine, ProcessResolver};
 use syswall_infra::conntrack::{ConntrackConfig, ConntrackMonitorAdapter};
+use syswall_infra::connectivity::TcpProbe;
 use syswall_infra::dns::DnsResolver as InfraDnsResolver;
 use syswall_infra::event_bus::TokioBroadcastEventBus;
 use syswall_infra::nftables::{NftablesConfig, NftablesFirewallAdapter};
@@ -27,6 +30,7 @@ use syswall_ebpf::{EbpfProcessResolver, HybridProcessResolver};
 use syswall_infra::process::{ProcfsConfig, ProcfsProcessResolver};
 
 use crate::config::SysWallConfig;
+use crate::startup_error::StartupError;
 
 /// All the wired-up services, ready to use.
 /// Tous les services assembles, prets a l'emploi.
@@ -49,9 +53,12 @@ pub struct AppContext {
 
 /// Wire up all dependencies and return the application context.
 /// Assemble toutes les dependances et retourne le contexte applicatif.
-pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, DomainError> {
+pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
     // Database
-    let db = Arc::new(Database::open(&config.database.path)?);
+    let db = Arc::new(
+        Database::open(&config.database.path)
+            .map_err(|e| StartupError::InfrastructureInit(e.to_string()))?,
+    );
 
     // Repositories
     let rule_repo = Arc::new(SqliteRuleRepository::new(db.clone()));
@@ -79,12 +86,48 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, DomainError> {
         Arc::new(FakeFirewallEngine::new())
     } else {
         info!("Using NftablesFirewallAdapter");
-        Arc::new(NftablesFirewallAdapter::new(NftablesConfig {
+        let nft_adapter = NftablesFirewallAdapter::new(NftablesConfig {
             table_name: config.firewall.nftables_table_name.clone(),
             nft_binary_path: config.firewall.nft_binary_path.clone(),
             command_timeout: Duration::from_secs(config.firewall.nft_command_timeout_secs),
             max_output_bytes: config.firewall.nft_max_output_bytes,
-        })?)
+        })
+        .map_err(|e| StartupError::InfrastructureInit(e.to_string()))?;
+
+        // Injection du guard anti-lockout dans l'adaptateur nftables
+        // Inject the anti-lockout guard into the nftables adapter
+        let al_cfg = config
+            .antilockout
+            .clone()
+            .unwrap_or_else(crate::config::AntilockoutConfig::default);
+
+        let nft_adapter = if al_cfg.enabled {
+            let endpoints: Result<Vec<SocketAddr>, _> = al_cfg
+                .endpoints
+                .iter()
+                .map(|s| s.parse::<SocketAddr>())
+                .collect();
+            let endpoints = endpoints.map_err(|e| {
+                StartupError::ConfigInvalid(format!("antilockout.endpoints parse error: {e}"))
+            })?;
+            let probe = Arc::new(
+                TcpProbe::new(endpoints, Duration::from_secs(al_cfg.per_endpoint_timeout_secs))
+                    .map_err(|e| StartupError::ConfigInvalid(format!("antilockout: {e}")))?,
+            );
+            let guard = Arc::new(AntilockoutGuard::new(
+                probe,
+                audit_repo.clone(),
+                GuardConfig {
+                    timeout: Duration::from_secs(al_cfg.timeout_secs),
+                    probe_interval: Duration::from_secs(al_cfg.probe_interval_secs),
+                },
+            ));
+            nft_adapter.with_lockout_guard(guard as Arc<dyn LockoutGuard>)
+        } else {
+            nft_adapter
+        };
+
+        Arc::new(nft_adapter)
     };
 
     // Résolveur de processus -- fake, ou hybrid (eBPF + procfs)
@@ -93,10 +136,13 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, DomainError> {
         info!("Using FakeProcessResolver (use_fake = true)");
         Arc::new(FakeProcessResolver::new())
     } else {
-        let procfs = Arc::new(ProcfsProcessResolver::new(ProcfsConfig {
-            cache_capacity: config.monitoring.process_cache_capacity,
-            cache_ttl: Duration::from_secs(config.monitoring.process_cache_ttl_secs),
-        })?);
+        let procfs = Arc::new(
+            ProcfsProcessResolver::new(ProcfsConfig {
+                cache_capacity: config.monitoring.process_cache_capacity,
+                cache_ttl: Duration::from_secs(config.monitoring.process_cache_ttl_secs),
+            })
+            .map_err(|e| StartupError::InfrastructureInit(e.to_string()))?,
+        );
 
         // Tente de charger eBPF, fallback silencieux vers procfs seul
         // Try eBPF, silent fallback to procfs-only
@@ -130,11 +176,14 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, DomainError> {
         Arc::new(FakeConnectionMonitor::new())
     } else {
         info!("Using ConntrackMonitorAdapter");
-        Arc::new(ConntrackMonitorAdapter::new(ConntrackConfig {
-            binary_path: config.monitoring.conntrack_binary_path.clone(),
-            protocols: config.monitoring.conntrack_protocols.clone(),
-            buffer_size: config.monitoring.conntrack_buffer_size,
-        })?)
+        Arc::new(
+            ConntrackMonitorAdapter::new(ConntrackConfig {
+                binary_path: config.monitoring.conntrack_binary_path.clone(),
+                protocols: config.monitoring.conntrack_protocols.clone(),
+                buffer_size: config.monitoring.conntrack_buffer_size,
+            })
+            .map_err(|e| StartupError::InfrastructureInit(e.to_string()))?,
+        )
     };
 
     let notifier = Arc::new(FakeUserNotifier::new());
