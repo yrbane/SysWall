@@ -14,6 +14,7 @@
   import { initAntilockoutListener } from '$lib/stores/antilockout';
   import { startTrafficTrend, stopTrafficTrend } from '$lib/stores/dashboard';
   import { setNetworkEnabled } from '$lib/api/client';
+  import { addToast } from '$lib/stores/toast';
   import { onMount } from 'svelte';
   import type { Snippet } from 'svelte';
 
@@ -58,10 +59,25 @@
   });
 
   async function toggleNetwork() {
+    const previousState = networkEnabled;
+    const newState = !previousState;
     try {
-      await setNetworkEnabled(!networkEnabled);
-      networkEnabled = !networkEnabled;
-    } catch { /* toast gère l'erreur */ }
+      await setNetworkEnabled(newState);
+      networkEnabled = newState;
+      const message = newState
+        ? 'Reseau retabli.'
+        : 'Reseau coupe. Toutes les connexions sont bloquees.';
+      const variant = newState ? 'success' : 'warning';
+      addToast(message, variant, 5000, {
+        label: 'Annuler',
+        handler: async () => {
+          await setNetworkEnabled(previousState);
+          networkEnabled = previousState;
+        },
+      });
+    } catch (e) {
+      addToast(`Erreur killswitch : ${e}`, 'error', 6000);
+    }
   }
 
   onMount(() => {
