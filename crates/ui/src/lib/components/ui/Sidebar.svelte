@@ -2,6 +2,15 @@
   import { page } from '$app/stores';
   import SyswallLogo from '$lib/components/branding/SyswallLogo.svelte';
   import { LayoutDashboard, Network, Shield, BrainCircuit, Ban, ClipboardList, Settings } from 'lucide-svelte';
+  // lucide-svelte 1.x expose les icônes comme des classes SvelteComponentTyped (API Svelte 4),
+  // incompatibles avec Component<Props> de Svelte 5. Un type précis nécessite que lucide-svelte
+  // migre vers l'API Svelte 5 (suivi upstream : https://github.com/lucide-icons/lucide/issues/2066).
+  // On conserve 'any' jusqu'au fix amont avec la désactivation ESLint explicite.
+  //
+  // lucide-svelte 1.x exposes icons as SvelteComponentTyped classes (Svelte 4 API),
+  // incompatible with Svelte 5's Component<Props> type. A precise type requires lucide-svelte
+  // to migrate to the Svelte 5 API (upstream tracking: https://github.com/lucide-icons/lucide/issues/2066).
+  // Keeping 'any' until upstream fix with explicit ESLint disable.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   type IconComponent = any;
 
