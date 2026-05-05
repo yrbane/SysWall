@@ -37,3 +37,13 @@ All notable changes documented here.
 - `docs/superpowers/specs/2026-05-05-security-hardening-design.md` : spec de conception.
 - `docs/superpowers/plans/2026-05-05-security-hardening-plan.md` : plan d'implementation TDD.
 - `docs/audit-2026-05-04.md` : audit complet a l'origine de cette version.
+
+### Code Hygiene
+
+- **`unwrap()` en production eradiques** : ~63 occurrences en production remplacees par `?` (propagation) ou `expect("invariant en francais")` documentees. Les crates `domain`, `app`, `daemon`, `infra`, `ebpf` activent maintenant `#![cfg_attr(not(test), deny(clippy::unwrap_used))]`.
+- **God-modules scindes** : `policy_engine` (matcher + evaluator), `audit_service` (command + query CQRS-light), `converters` (rule + decision + audit + connection + error + parsers + event), `audit_repository` (queries + writes + migration), `translator` (criteria + verdict + system_rules), `adapter` (apply + rollback + whitelist). Aucun module de production > 500 LOC sauf integration tests.
+- **Version du workspace** : alignee a `0.2.0` (coherent avec les paquets systeme).
+- **Dependance Cargo `infra -> app`** : retiree (etait inutilisee, violation hexagonale au niveau Cargo).
+- **CI** : `cargo clippy --workspace --exclude ui --all-targets -- -D warnings` est maintenant un gate obligatoire.
+- **24 warnings clippy `infra`** : tous corriges.
+- **21 warnings clippy `daemon`** pre-existants : tous corriges.
