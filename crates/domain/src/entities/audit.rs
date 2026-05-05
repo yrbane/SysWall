@@ -48,6 +48,8 @@ pub enum EventCategory {
     Decision,
     System,
     Config,
+    Antilockout,
+    Authentication,
 }
 
 /// A journal entry in the audit log.
@@ -125,5 +127,25 @@ mod tests {
         assert!(Severity::Info < Severity::Warning);
         assert!(Severity::Warning < Severity::Error);
         assert!(Severity::Error < Severity::Critical);
+    }
+
+    #[test]
+    fn antilockout_category_exists() {
+        let event = AuditEvent::new(
+            Severity::Critical,
+            EventCategory::Antilockout,
+            "rolled back",
+        );
+        assert_eq!(event.category, EventCategory::Antilockout);
+    }
+
+    #[test]
+    fn authentication_category_exists() {
+        let event = AuditEvent::new(
+            Severity::Warning,
+            EventCategory::Authentication,
+            "denied",
+        );
+        assert_eq!(event.category, EventCategory::Authentication);
     }
 }

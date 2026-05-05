@@ -28,4 +28,23 @@ pub enum DomainError {
     /// Opération non autorisée dans le contexte actuel.
     #[error("Operation not permitted: {0}")]
     NotPermitted(String),
+
+    /// Anti-lockout triggered: connectivity was lost after a ruleset apply, rules rolled back.
+    /// Anti-lockout déclenché : la connectivité a été perdue après un apply, règles annulées.
+    #[error("Anti-lockout triggered: {rolled_back_count} rule change(s) rolled back due to lost connectivity")]
+    AntilockoutTriggered { rolled_back_count: usize },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn antilockout_triggered_displays_count() {
+        let err = DomainError::AntilockoutTriggered { rolled_back_count: 3 };
+        assert_eq!(
+            err.to_string(),
+            "Anti-lockout triggered: 3 rule change(s) rolled back due to lost connectivity"
+        );
+    }
 }

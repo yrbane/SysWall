@@ -30,6 +30,7 @@ pub fn domain_error_to_status(e: DomainError) -> tonic::Status {
         DomainError::AlreadyExists(msg) => tonic::Status::already_exists(msg),
         DomainError::Infrastructure(msg) => tonic::Status::internal(msg),
         DomainError::NotPermitted(msg) => tonic::Status::permission_denied(msg),
+        DomainError::AntilockoutTriggered { .. } => tonic::Status::failed_precondition(e.to_string()),
     }
 }
 
@@ -320,8 +321,10 @@ fn parse_event_category(s: &str) -> Result<EventCategory, tonic::Status> {
         "Decision" => Ok(EventCategory::Decision),
         "System" => Ok(EventCategory::System),
         "Config" => Ok(EventCategory::Config),
+        "Antilockout" => Ok(EventCategory::Antilockout),
+        "Authentication" => Ok(EventCategory::Authentication),
         _ => Err(tonic::Status::invalid_argument(format!(
-            "Unknown category: '{}'. Expected: Connection, Rule, Decision, System, Config",
+            "Unknown category: '{}'. Expected: Connection, Rule, Decision, System, Config, Antilockout, Authentication",
             s
         ))),
     }
