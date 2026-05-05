@@ -20,7 +20,9 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace -- -D warnings
+      # ui (crate Tauri) exclu: depend de Tauri qui a ses propres conventions de lint, hors scope sous-projet B.
+      - name: cargo clippy (workspace, all targets, deny warnings)
+        run: cargo clippy --workspace --exclude ui --all-targets -- -D warnings
 
   test:
     name: Tests
