@@ -31,3 +31,6 @@ sd-notify = "0.4"
 thiserror = { workspace = true }
 async-trait = { workspace = true }
 syswall-ebpf = { path = "../ebpf" }
+
+[dev-dependencies]
+tempfile = "3"
