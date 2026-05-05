@@ -2,6 +2,7 @@
 name = "syswall-daemon"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [dependencies]
 syswall-domain = { path = "../domain" }

@@ -1,0 +1,104 @@
+# Configuration cargo-deny
+# https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+# Cibles courantes (server Linux + CI Linux). On evite les targets exotiques pour
+# accelerer la resolution sans perdre en couverture.
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-gnu" },
+]
+# Exclure les crates en dev-dependencies du graphe ? Non, car certaines vulns
+# en dev-deps peuvent fuiter en CI/build.
+all-features = false
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+# ----------------------------------------------------------------------------
+# advisories : CVE et avis securite (RustSec)
+# ----------------------------------------------------------------------------
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# Des advisories specifiques a ignorer. A utiliser avec moderation et toujours
+# documenter pourquoi (commenter avec date + justification).
+ignore = [
+    # Tous les advisories ci-dessous concernent des crates "unmaintained" tirees
+    # transitivement par Tauri / GTK / wry. SysWall ne peut pas les remplacer
+    # sans patcher Tauri en amont. A reevaluer a chaque major bump de Tauri.
+    # All advisories below concern "unmaintained" crates pulled transitively by
+    # Tauri / GTK / wry. SysWall cannot replace them without patching Tauri
+    # upstream. Re-evaluate at each Tauri major bump.
+    "RUSTSEC-2024-0370", # proc-macro-error unmaintained (deps tauri-macros)
+    "RUSTSEC-2024-0411", # gtk3 bindings unmaintained (transitif tauri-runtime-wry)
+    "RUSTSEC-2024-0412", # idem
+    "RUSTSEC-2024-0413", # idem
+    "RUSTSEC-2024-0414", # idem
+    "RUSTSEC-2024-0415", # idem
+    "RUSTSEC-2024-0416", # idem
+    "RUSTSEC-2024-0417", # idem
+    "RUSTSEC-2024-0418", # idem
+    "RUSTSEC-2024-0419", # idem
+    "RUSTSEC-2024-0420", # idem
+    "RUSTSEC-2025-0057", # fxhash unmaintained (transitif rustsec/wry)
+    "RUSTSEC-2025-0075", # transitif tauri
+    "RUSTSEC-2025-0080", # transitif tauri
+    "RUSTSEC-2025-0081", # transitif tauri
+    "RUSTSEC-2025-0098", # unic-ucd-version (transitif urlpattern -> tauri-utils)
+    "RUSTSEC-2025-0100", # transitif tauri
+]
+
+# ----------------------------------------------------------------------------
+# licenses : autorisations / interdictions
+# ----------------------------------------------------------------------------
+[licenses]
+# Confiance minimale (sur 1.0) pour les licenses detectees automatiquement.
+confidence-threshold = 0.8
+# Whitelist : seules ces licenses sont autorisees pour tout le graphe.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "CC0-1.0",
+    "0BSD",
+]
+# Exceptions par crate si une license est unique a ce crate.
+exceptions = [
+    # exemple : { allow = ["MPL-2.0"], crate = "webpki-roots" },
+]
+
+# ----------------------------------------------------------------------------
+# bans : crates interdits ou versions multiples
+# ----------------------------------------------------------------------------
+[bans]
+# Avertir sur les versions multiples du meme crate (peut indiquer des deps
+# obsoletes pas mises a jour) sans bloquer la build.
+multiple-versions = "warn"
+# Algo de resolution : preferer la profondeur (proche de l'app) sur la largeur.
+wildcards = "warn"
+highlight = "all"
+# Crates explicitement interdits (= jamais en deps directes ou transitives).
+deny = [
+    # exemple : { name = "openssl", reason = "remplace par rustls dans tout le projet" }
+]
+# Crates dont plusieurs versions sont OK car cassures de SemVer non rattrapables.
+skip = []
+skip-tree = []
+
+# ----------------------------------------------------------------------------
+# sources : registries autorises
+# ----------------------------------------------------------------------------
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

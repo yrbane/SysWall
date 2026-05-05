@@ -57,6 +57,16 @@ jobs:
       - run: cargo audit
       - run: cd crates/ui && npm audit --audit-level=high
 
+  deny:
+    name: Cargo deny (licenses + bans + sources + advisories)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --config deny.toml
+
   hardening-check:
     name: systemd hardening check
     runs-on: ubuntu-latest

@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "SysWall Desktop Firewall UI"
 authors = ["you"]
 edition = "2021"
+license = "MIT"
 
 [lib]
 name = "ui_lib"
