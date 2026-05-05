@@ -26,6 +26,12 @@ impl FakeAuditRepository {
         }
     }
 
+    /// Retourne une copie de tous les événements stockés (pour les assertions de test).
+    /// Returns a clone of all stored events (for test assertions).
+    pub async fn snapshot(&self) -> Vec<syswall_domain::entities::AuditEvent> {
+        self.events.lock().unwrap().clone()
+    }
+
     /// Apply filters to a list of events (for realistic fake queries).
     /// Applique les filtres à une liste d'événements (pour des requêtes factices réalistes).
     fn matches(event: &AuditEvent, filters: &AuditFilters) -> bool {

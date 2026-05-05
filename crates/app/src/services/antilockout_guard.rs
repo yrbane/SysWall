@@ -190,6 +190,7 @@ mod tests {
     use super::*;
     use crate::fakes::fake_audit_repository::FakeAuditRepository;
     use crate::fakes::fake_connectivity_probe::FakeConnectivityProbe;
+    use syswall_domain::ports::connectivity::ProbeOutcome;
 
     fn noop_rollback() -> RollbackFn {
         Box::new(|| Box::pin(async { Ok(()) }))
@@ -226,5 +227,100 @@ mod tests {
         let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default());
         let err = guard.confirm().await.unwrap_err();
         assert_eq!(err, GuardError::NotArmed);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn all_probes_unreachable_triggers_rollback() {
+        let probe = Arc::new(FakeConnectivityProbe::always_unreachable());
+        let audit = Arc::new(FakeAuditRepository::new());
+        let guard = AntilockoutGuard::new(probe, audit.clone(), AntilockoutConfig::default());
+        let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter_clone = counter.clone();
+        let rollback: RollbackFn = Box::new(move || {
+            let c = counter_clone.clone();
+            Box::pin(async move {
+                c.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            })
+        });
+        guard.arm(3, rollback).await.unwrap();
+        // Avance par intervalles pour laisser la tâche spawned traiter chaque tick.
+        // Advance in increments so the spawned task can process each probe tick.
+        for _ in 0..8 {
+            tokio::time::advance(Duration::from_secs(5)).await;
+            tokio::task::yield_now().await;
+        }
+        // Laisse la tâche finaliser le rollback et la mise à jour de l'état.
+        // Let the task finalize rollback and state update.
+        tokio::time::sleep(Duration::from_millis(1)).await;
+        for _ in 0..5 {
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert!(!guard.is_armed().await);
+        let events = audit.snapshot().await;
+        assert!(events
+            .iter()
+            .any(|e| e.severity == syswall_domain::entities::Severity::Critical
+                && e.category == syswall_domain::entities::EventCategory::Antilockout));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn recovery_mid_window_does_not_rollback() {
+        // Injoignable pendant les 3 premiers ticks, puis joignable.
+        // Unreachable for first 3 ticks, then reachable.
+        let probe = Arc::new(FakeConnectivityProbe::with_sequence(vec![
+            Ok(ProbeOutcome::Unreachable),
+            Ok(ProbeOutcome::Unreachable),
+            Ok(ProbeOutcome::Unreachable),
+            Ok(ProbeOutcome::Reachable),
+        ]));
+        let audit = Arc::new(FakeAuditRepository::new());
+        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default());
+        let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter_clone = counter.clone();
+        let rollback: RollbackFn = Box::new(move || {
+            let c = counter_clone.clone();
+            Box::pin(async move {
+                c.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            })
+        });
+        guard.arm(1, rollback).await.unwrap();
+        // Avance par intervalles pour laisser la tâche spawned traiter chaque tick.
+        // Advance in increments so the spawned task can process each probe tick.
+        for _ in 0..5 {
+            tokio::time::advance(Duration::from_secs(5)).await;
+            tokio::task::yield_now().await;
+        }
+        // Laisse la tâche terminer sa mise à jour d'état.
+        // Let the task finish updating state.
+        tokio::time::sleep(Duration::from_millis(1)).await;
+        for _ in 0..5 {
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(!guard.is_armed().await);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn manual_confirm_cancels_timer() {
+        let probe = Arc::new(FakeConnectivityProbe::always_unreachable());
+        let audit = Arc::new(FakeAuditRepository::new());
+        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default());
+        let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter_clone = counter.clone();
+        let rollback: RollbackFn = Box::new(move || {
+            let c = counter_clone.clone();
+            Box::pin(async move {
+                c.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            })
+        });
+        guard.arm(1, rollback).await.unwrap();
+        tokio::time::advance(Duration::from_secs(10)).await;
+        guard.confirm().await.unwrap();
+        tokio::time::advance(Duration::from_secs(60)).await;
+        assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 }
