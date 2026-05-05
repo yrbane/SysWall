@@ -372,7 +372,12 @@ impl FirewallEngine for NftablesFirewallAdapter {
                     });
                 guard.arm_rollback(1, rollback).await?;
             } else {
-                tracing::warn!(target: "antilockout", "guard bypass: whitelist-only ruleset");
+                tracing::warn!(
+                    target: "antilockout",
+                    rule_name = %rule.name,
+                    reason = "whitelist-only",
+                    "guard bypass: anti-lockout not armed for whitelist rule"
+                );
             }
         }
 
@@ -551,7 +556,12 @@ impl FirewallEngine for NftablesFirewallAdapter {
                     });
                 guard.arm_rollback(count, rollback).await?;
             } else {
-                tracing::warn!(target: "antilockout", "guard bypass: whitelist-only ruleset");
+                tracing::warn!(
+                    target: "antilockout",
+                    rule_count = rules.len(),
+                    reason = "whitelist-only",
+                    "guard bypass: anti-lockout not armed for whitelist-only ruleset"
+                );
             }
         }
 
@@ -689,6 +699,21 @@ mod tests {
             }
             _ => panic!("Expected Infrastructure error"),
         }
+    }
+
+    #[test]
+    fn whitelist_dhcp_68() {
+        let rule = build_test_rule(Some(Protocol::Udp), Some(68), None, None);
+        assert!(super::is_whitelist_rule(&rule));
+    }
+
+    #[test]
+    fn whitelist_loopback_ipv4() {
+        let mut rule = build_test_rule(Some(Protocol::Tcp), Some(443), None, None);
+        rule.criteria.remote_ip = Some(syswall_domain::entities::IpMatcher::Exact(
+            "127.0.0.1".parse().unwrap(),
+        ));
+        assert!(super::is_whitelist_rule(&rule));
     }
 }
 
