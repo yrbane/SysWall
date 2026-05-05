@@ -1,8 +1,8 @@
-/// Résout les icônes d'applications depuis les fichiers .desktop et les thèmes d'icônes.
-/// Suit le thème GTK actif du système (ex: Papirus, Adwaita) avec chaîne d'héritage.
-///
-/// Resolves application icons from .desktop files and icon themes.
-/// Follows the active GTK icon theme (e.g., Papirus, Adwaita) with inheritance chain.
+//! Résout les icônes d'applications depuis les fichiers .desktop et les thèmes d'icônes.
+//! Suit le thème GTK actif du système (ex: Papirus, Adwaita) avec chaîne d'héritage.
+//!
+//! Resolves application icons from .desktop files and icon themes.
+//! Follows the active GTK icon theme (e.g., Papirus, Adwaita) with inheritance chain.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -18,6 +18,12 @@ pub struct IconResolver {
     /// Chaîne de thèmes d'icônes à chercher (thème actif + héritage + hicolor)
     /// Icon theme chain to search (active theme + inheritance + hicolor)
     theme_chain: Vec<String>,
+}
+
+impl Default for IconResolver {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl IconResolver {
@@ -63,24 +69,21 @@ impl IconResolver {
     fn resolve_inner(&self, exe_name: &str, exe_path: Option<&Path>) -> Option<String> {
         // 1. Chercher par nom d'exécutable dans l'index desktop
         // 1. Search by executable name in desktop index
-        if let Some(icon_name) = self.desktop_index.get(exe_name) {
-            if let Some(path) = self.find_icon_file(icon_name) {
-                return Some(path);
-            }
+        if let Some(icon_name) = self.desktop_index.get(exe_name)
+            && let Some(path) = self.find_icon_file(icon_name)
+        {
+            return Some(path);
         }
 
         // 2. Chercher par basename du chemin de l'exécutable
         // 2. Search by basename of executable path
-        if let Some(path) = exe_path {
-            if let Some(basename) = path.file_name().and_then(|n| n.to_str()) {
-                if basename != exe_name {
-                    if let Some(icon_name) = self.desktop_index.get(basename) {
-                        if let Some(path) = self.find_icon_file(icon_name) {
-                            return Some(path);
-                        }
-                    }
-                }
-            }
+        if let Some(path) = exe_path
+            && let Some(basename) = path.file_name().and_then(|n| n.to_str())
+            && basename != exe_name
+            && let Some(icon_name) = self.desktop_index.get(basename)
+            && let Some(path) = self.find_icon_file(icon_name)
+        {
+            return Some(path);
         }
 
         // 3. Essayer le nom de l'exécutable directement comme nom d'icône
@@ -92,10 +95,10 @@ impl IconResolver {
         // 4. Essayer en minuscules
         // 4. Try lowercase
         let lower = exe_name.to_lowercase();
-        if lower != exe_name {
-            if let Some(path) = self.find_icon_file(&lower) {
-                return Some(path);
-            }
+        if lower != exe_name
+            && let Some(path) = self.find_icon_file(&lower)
+        {
+            return Some(path);
         }
 
         None
@@ -140,17 +143,16 @@ impl IconResolver {
         if let Ok(output) = std::process::Command::new("gsettings")
             .args(["get", "org.gnome.desktop.interface", "icon-theme"])
             .output()
+            && output.status.success()
         {
-            if output.status.success() {
-                let theme = String::from_utf8_lossy(&output.stdout)
-                    .trim()
-                    .trim_matches('\'')
-                    .to_string();
-                // Ignorer "Adwaita" si on est root — c'est probablement le défaut, pas le choix de l'utilisateur
-                // Ignore "Adwaita" if running as root — it's likely the default, not the user's choice
-                if !theme.is_empty() && !(theme == "Adwaita" && nix::unistd::getuid().is_root()) {
-                    return Some(theme);
-                }
+            let theme = String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .trim_matches('\'')
+                .to_string();
+            // Ignorer "Adwaita" si on est root — c'est probablement le défaut, pas le choix de l'utilisateur
+            // Ignore "Adwaita" if running as root — it's likely the default, not the user's choice
+            if !(theme.is_empty() || theme == "Adwaita" && nix::unistd::getuid().is_root()) {
+                return Some(theme);
             }
         }
 
@@ -351,7 +353,7 @@ impl IconResolver {
                 icon = Some(value.trim().to_string());
             }
             if let Some(value) = trimmed.strip_prefix("Exec=") {
-                let parts: Vec<&str> = value.trim().split_whitespace().collect();
+                let parts: Vec<&str> = value.split_whitespace().collect();
                 for part in &parts {
                     let p = Path::new(part);
                     if let Some(name) = p.file_name().and_then(|n| n.to_str()) {

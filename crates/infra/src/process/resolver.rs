@@ -194,12 +194,11 @@ impl ProcfsProcessResolver {
                 break;
             }
             // Try to extract port from addr:port format
-            if let Some(port_str) = field.rsplit(':').next() {
-                if let Ok(port) = port_str.parse::<u16>() {
-                    if port > 0 {
-                        return Some(port);
-                    }
-                }
+            if let Some(port_str) = field.rsplit(':').next()
+                && let Ok(port) = port_str.parse::<u16>()
+                && port > 0
+            {
+                return Some(port);
             }
         }
         None
@@ -360,7 +359,7 @@ impl ProcessResolver for ProcfsProcessResolver {
 
         if needs_refresh {
             let new_table =
-                tokio::task::spawn_blocking(|| Self::refresh_socket_table())
+                tokio::task::spawn_blocking(Self::refresh_socket_table)
                     .await
                     .map_err(|e| {
                         DomainError::Infrastructure(format!("spawn_blocking failed: {}", e))

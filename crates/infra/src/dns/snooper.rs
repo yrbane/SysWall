@@ -2,7 +2,7 @@ use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Cache d'associations IP → hostname capturées par snooping DNS.
 /// Cache of IP → hostname associations captured by DNS snooping.
@@ -49,6 +49,11 @@ impl DnsSnoopCache {
     /// Nombre d'entrées dans le cache / Number of entries in cache
     pub fn len(&self) -> usize {
         self.cache.len()
+    }
+
+    /// Indique si le cache est vide / Returns true if the cache is empty
+    pub fn is_empty(&self) -> bool {
+        self.cache.is_empty()
     }
 
     /// Nettoie les entrées expirées / Clean expired entries

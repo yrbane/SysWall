@@ -55,10 +55,10 @@ impl DnsResolverPort for DnsResolver {
         // Vérification du cache en premier
         {
             let mut cache = self.cache.lock().await;
-            if let Some(entry) = cache.get(&ip) {
-                if entry.inserted_at.elapsed() < self.ttl {
-                    return Ok(entry.hostname.clone());
-                }
+            if let Some(entry) = cache.get(&ip)
+                && entry.inserted_at.elapsed() < self.ttl
+            {
+                return Ok(entry.hostname.clone());
             }
         }
 

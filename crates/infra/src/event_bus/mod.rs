@@ -73,13 +73,12 @@ impl EventBus for TokioBroadcastEventBus {
         // on l'insère dans le buffer au lieu de l'envoyer directement
         // If merge buffer is active and event is ConnectionDetected,
         // insert into buffer instead of sending directly
-        if let Some(ref buffer) = self.merge_buffer {
-            if let DomainEvent::ConnectionDetected(ref conn) = event {
-                if let Ok(mut buf) = buffer.lock() {
-                    buf.insert(conn.id, conn.clone());
-                    return Ok(());
-                }
-            }
+        if let Some(ref buffer) = self.merge_buffer
+            && let DomainEvent::ConnectionDetected(ref conn) = event
+            && let Ok(mut buf) = buffer.lock()
+        {
+            buf.insert(conn.id, conn.clone());
+            return Ok(());
         }
 
         match self.sender.send(event) {

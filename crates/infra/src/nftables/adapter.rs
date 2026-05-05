@@ -275,16 +275,15 @@ impl FirewallEngine for NftablesFirewallAdapter {
         let output = self.execute_nft(&list_cmd_with_handles).await.unwrap_or_default();
 
         for line in output.lines() {
-            if line.contains("syswall-killswitch") {
-                if let Some(handle_str) = line.rsplit("handle ").next() {
-                    if let Ok(handle) = handle_str.trim().parse::<u64>() {
-                        let chain = if line.contains("output") { "output" } else { "input" };
-                        let del_cmd = NftCommandBuilder::delete_rule(
-                            &self.config.table_name, chain, handle,
-                        );
-                        let _ = self.execute_nft(&del_cmd).await;
-                    }
-                }
+            if line.contains("syswall-killswitch")
+                && let Some(handle_str) = line.rsplit("handle ").next()
+                && let Ok(handle) = handle_str.trim().parse::<u64>()
+            {
+                let chain = if line.contains("output") { "output" } else { "input" };
+                let del_cmd = NftCommandBuilder::delete_rule(
+                    &self.config.table_name, chain, handle,
+                );
+                let _ = self.execute_nft(&del_cmd).await;
             }
         }
         info!("Kill-switch désactivé : trafic rétabli");
@@ -340,7 +339,7 @@ impl FirewallEngine for NftablesFirewallAdapter {
                         e
                     );
                     // Rollback any rules added in this call
-                    self.rollback(&*rollback_state).await;
+                    self.rollback(&rollback_state).await;
                     return Err(e);
                 }
             }
@@ -489,7 +488,7 @@ impl FirewallEngine for NftablesFirewallAdapter {
                     );
                     if let Err(e) = self.execute_nft(&cmd).await {
                         error!("Sync: failed to remove stale rule {}: {}", uuid, e);
-                        self.rollback(&*rollback_state).await;
+                        self.rollback(&rollback_state).await;
                         return Err(e);
                     }
                 }
@@ -501,7 +500,7 @@ impl FirewallEngine for NftablesFirewallAdapter {
         for rule in &to_add {
             if let Err(e) = self.apply_rule(rule).await {
                 error!("Sync: failed to add rule {}: {}", rule.id.as_uuid(), e);
-                self.rollback(&*rollback_state).await;
+                self.rollback(&rollback_state).await;
                 return Err(e);
             }
         }
