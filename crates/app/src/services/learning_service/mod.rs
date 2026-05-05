@@ -20,6 +20,56 @@ use syswall_domain::services::PolicyEngine;
 
 use crate::commands::RespondToDecisionCommand;
 
+/// Erreur typee de l'attente d'un verdict utilisateur sur le broadcast.
+/// Typed error from waiting on a user verdict broadcast.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum VerdictWaitError {
+    /// La fenetre de 28s s'est ecoulee sans reponse utilisateur.
+    /// The 28s window elapsed without user response.
+    Timeout,
+    /// Le sender du broadcast a ete drop (resolveur disparu sans publier).
+    /// The broadcast sender was dropped (resolver gone without publishing).
+    ChannelClosed,
+    /// Le receiver a ete distance par les emissions (rare avec capacite 64).
+    /// Receiver lagged behind sends (rare with capacity 64).
+    ChannelLagged { missed: u64 },
+}
+
+impl VerdictWaitError {
+    /// Severite associee a l'erreur (timeout = warning, autres = error).
+    /// Severity for the error (timeout = warning, others = error).
+    fn severity(&self) -> Severity {
+        match self {
+            Self::Timeout => Severity::Warning,
+            Self::ChannelClosed | Self::ChannelLagged { .. } => Severity::Error,
+        }
+    }
+
+    /// Message d'audit en clair (preserve la chaine historique pour le timeout).
+    /// Audit message in plain text (preserves historical wording for timeout).
+    fn audit_message(&self) -> String {
+        match self {
+            Self::Timeout => "decision timeout: kernel will drop packet".to_string(),
+            Self::ChannelClosed => {
+                "verdict channel closed: resolver dropped before publishing".to_string()
+            }
+            Self::ChannelLagged { missed } => {
+                format!("verdict channel lagged: {missed} message(s) missed")
+            }
+        }
+    }
+
+    /// Etiquette courte pour la metadata d'audit (machine-readable).
+    /// Short label for audit metadata (machine-readable).
+    fn kind_label(&self) -> &'static str {
+        match self {
+            Self::Timeout => "timeout",
+            Self::ChannelClosed => "channel_closed",
+            Self::ChannelLagged { .. } => "channel_lagged",
+        }
+    }
+}
+
 /// Configuration for the learning subsystem.
 /// Configuration du sous-système d'apprentissage.
 pub struct LearningConfig {
@@ -224,22 +274,42 @@ impl LearningService {
         use std::time::Duration as StdDuration;
 
         let mut rx = self.verdict_broadcasts.subscribe(id).await;
-        match tokio::time::timeout(StdDuration::from_secs(28), rx.recv()).await {
-            Ok(Ok(verdict)) => Ok(verdict),
-            Ok(Err(_)) => Ok(PacketVerdict::Drop),
-            Err(_) => {
-                // Timeout : audit + action configurable.
-                // Timeout: audit + configurable action.
+        let outcome: Result<PacketVerdict, VerdictWaitError> =
+            match tokio::time::timeout(StdDuration::from_secs(28), rx.recv()).await {
+                Ok(Ok(verdict)) => Ok(verdict),
+                Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) => {
+                    Err(VerdictWaitError::ChannelClosed)
+                }
+                Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(missed))) => {
+                    Err(VerdictWaitError::ChannelLagged { missed })
+                }
+                Err(_) => Err(VerdictWaitError::Timeout),
+            };
+
+        match outcome {
+            Ok(verdict) => Ok(verdict),
+            Err(err) => {
+                // Audit dedie selon le type d'erreur.
+                // Dedicated audit per error kind.
                 let event = AuditEvent::new(
-                    Severity::Warning,
+                    err.severity(),
                     EventCategory::Decision,
-                    "decision timeout: kernel will drop packet",
+                    err.audit_message(),
                 )
-                .with_metadata("decision_id", id.as_uuid().to_string());
+                .with_metadata("decision_id", id.as_uuid().to_string())
+                .with_metadata("wait_error", err.kind_label());
                 let _ = self.audit_repo.append(&event).await;
-                Ok(match self.config.default_timeout_action.as_str() {
-                    "allow" => PacketVerdict::Accept,
-                    _ => PacketVerdict::Drop,
+
+                // Mapping d'action : timeout suit la config, autres erreurs = fail-safe Drop.
+                // Action mapping: timeout follows config, other errors = fail-safe Drop.
+                Ok(match err {
+                    VerdictWaitError::Timeout => match self.config.default_timeout_action.as_str() {
+                        "allow" => PacketVerdict::Accept,
+                        _ => PacketVerdict::Drop,
+                    },
+                    VerdictWaitError::ChannelClosed | VerdictWaitError::ChannelLagged { .. } => {
+                        PacketVerdict::Drop
+                    }
                 })
             }
         }
@@ -336,6 +406,41 @@ mod tests {
     use crate::fakes::*;
     use syswall_domain::entities::*;
     use syswall_domain::value_objects::*;
+
+    #[test]
+    fn verdict_wait_error_severity_mapping() {
+        assert_eq!(VerdictWaitError::Timeout.severity(), Severity::Warning);
+        assert_eq!(VerdictWaitError::ChannelClosed.severity(), Severity::Error);
+        assert_eq!(
+            VerdictWaitError::ChannelLagged { missed: 5 }.severity(),
+            Severity::Error
+        );
+    }
+
+    #[test]
+    fn verdict_wait_error_kind_labels() {
+        assert_eq!(VerdictWaitError::Timeout.kind_label(), "timeout");
+        assert_eq!(VerdictWaitError::ChannelClosed.kind_label(), "channel_closed");
+        assert_eq!(
+            VerdictWaitError::ChannelLagged { missed: 1 }.kind_label(),
+            "channel_lagged"
+        );
+    }
+
+    #[test]
+    fn verdict_wait_error_messages_distinct() {
+        let timeout = VerdictWaitError::Timeout.audit_message();
+        let closed = VerdictWaitError::ChannelClosed.audit_message();
+        let lagged = VerdictWaitError::ChannelLagged { missed: 7 }.audit_message();
+
+        // Le message timeout doit rester strictement identique aux versions
+        // anterieures (test d'integration en aval depend de cette chaine).
+        // The timeout message must remain strictly identical to previous versions
+        // (downstream integration test depends on this string).
+        assert_eq!(timeout, "decision timeout: kernel will drop packet");
+        assert!(closed.contains("channel closed"));
+        assert!(lagged.contains("7"));
+    }
 
     fn test_snapshot() -> ConnectionSnapshot {
         ConnectionSnapshot {
