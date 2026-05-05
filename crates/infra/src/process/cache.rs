@@ -27,7 +27,7 @@ impl ProcessCache {
     /// Create a new cache with the given capacity and TTL.
     /// Cree un nouveau cache avec la capacite et le TTL donnes.
     pub fn new(capacity: usize, ttl: Duration) -> Self {
-        let cap = NonZeroUsize::new(capacity.max(1)).unwrap();
+        let cap = NonZeroUsize::new(capacity.max(1)).expect("capacity.max(1) >= 1, jamais zéro / never zero");
         Self {
             pid_cache: Mutex::new(LruCache::new(cap)),
             inode_cache: Mutex::new(LruCache::new(cap)),
@@ -38,7 +38,7 @@ impl ProcessCache {
     /// Get a cached entry by PID. Returns None if not found or stale.
     /// Retourne une entree mise en cache par PID. Retourne None si introuvable ou perimee.
     pub fn get_by_pid(&self, pid: u32) -> Option<(ProcessInfo, Option<SystemUser>)> {
-        let mut cache = self.pid_cache.lock().unwrap();
+        let mut cache = self.pid_cache.lock().expect("Mutex jamais empoisonné / never poisoned");
         let entry = cache.get(&pid)?;
         if entry.inserted_at.elapsed() > self.ttl {
             cache.pop(&pid);
@@ -50,7 +50,7 @@ impl ProcessCache {
     /// Get a cached entry by socket inode. Returns None if not found or stale.
     /// Retourne une entree mise en cache par inode de socket. Retourne None si introuvable ou perimee.
     pub fn get_by_inode(&self, inode: u64) -> Option<(ProcessInfo, Option<SystemUser>)> {
-        let mut cache = self.inode_cache.lock().unwrap();
+        let mut cache = self.inode_cache.lock().expect("Mutex jamais empoisonné / never poisoned");
         let entry = cache.get(&inode)?;
         if entry.inserted_at.elapsed() > self.ttl {
             cache.pop(&inode);
@@ -62,7 +62,7 @@ impl ProcessCache {
     /// Insert a process info entry by PID.
     /// Insere une entree d'info processus par PID.
     pub fn insert_pid(&self, pid: u32, info: ProcessInfo, user: Option<SystemUser>) {
-        let mut cache = self.pid_cache.lock().unwrap();
+        let mut cache = self.pid_cache.lock().expect("Mutex jamais empoisonné / never poisoned");
         cache.put(
             pid,
             CacheEntry {
@@ -76,7 +76,7 @@ impl ProcessCache {
     /// Insert a process info entry by socket inode.
     /// Insere une entree d'info processus par inode de socket.
     pub fn insert_inode(&self, inode: u64, info: ProcessInfo, user: Option<SystemUser>) {
-        let mut cache = self.inode_cache.lock().unwrap();
+        let mut cache = self.inode_cache.lock().expect("Mutex jamais empoisonné / never poisoned");
         cache.put(
             inode,
             CacheEntry {

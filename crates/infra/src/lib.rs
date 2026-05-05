@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), deny(clippy::unwrap_used))]
+
 pub mod blocklist;
 pub mod connectivity;
 pub mod conntrack;

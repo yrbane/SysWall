@@ -52,7 +52,7 @@ impl IconResolver {
     /// Résout le chemin d'une icône pour un nom d'exécutable ou un chemin complet.
     /// Resolve an icon path for an executable name or full path.
     pub fn resolve(&self, exe_name: &str, exe_path: Option<&Path>) -> Option<String> {
-        if let Some(cached) = self.cache.lock().unwrap().get(exe_name) {
+        if let Some(cached) = self.cache.lock().expect("Mutex jamais empoisonné / never poisoned").get(exe_name) {
             return cached.clone();
         }
 
@@ -60,7 +60,7 @@ impl IconResolver {
 
         self.cache
             .lock()
-            .unwrap()
+            .expect("Mutex jamais empoisonné / never poisoned")
             .insert(exe_name.to_string(), result.clone());
 
         result

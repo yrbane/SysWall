@@ -50,7 +50,7 @@ impl TokioBroadcastEventBus {
             loop {
                 tokio::time::sleep(window).await;
                 let events: Vec<syswall_domain::entities::Connection> = {
-                    let mut buf = buf_clone.lock().unwrap();
+                    let mut buf = buf_clone.lock().expect("Mutex jamais empoisonné / never poisoned");
                     buf.drain().map(|(_, conn)| conn).collect()
                 };
                 for conn in events {

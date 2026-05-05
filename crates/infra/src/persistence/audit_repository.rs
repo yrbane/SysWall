@@ -36,8 +36,12 @@ impl SqliteAuditRepository {
             .unwrap_or(EventCategory::System);
 
         Ok(AuditEvent {
-            id: EventId::from_uuid(id_str.parse().unwrap()),
-            timestamp: timestamp_str.parse().unwrap(),
+            id: EventId::from_uuid(
+                id_str.parse().expect("UUID stocké par notre code / stored by our code"),
+            ),
+            timestamp: timestamp_str
+                .parse()
+                .expect("RFC3339 stocké par notre code / stored by our code"),
             severity,
             category,
             description,
@@ -57,7 +61,7 @@ impl SqliteAuditRepository {
             clauses.push("severity = ?".to_string());
             params.push(Box::new(
                 serde_json::to_string(severity)
-                    .unwrap()
+                    .expect("Severity sérialisable / serializable")
                     .trim_matches('"')
                     .to_string(),
             ));
@@ -66,7 +70,7 @@ impl SqliteAuditRepository {
             clauses.push("category = ?".to_string());
             params.push(Box::new(
                 serde_json::to_string(category)
-                    .unwrap()
+                    .expect("EventCategory sérialisable / serializable")
                     .trim_matches('"')
                     .to_string(),
             ));
@@ -107,10 +111,10 @@ impl AuditRepository for SqliteAuditRepository {
                     rusqlite::params![
                         event.id.as_uuid().to_string(),
                         event.timestamp.to_rfc3339(),
-                        serde_json::to_string(&event.severity).unwrap().trim_matches('"'),
-                        serde_json::to_string(&event.category).unwrap().trim_matches('"'),
+                        serde_json::to_string(&event.severity).expect("Severity sérialisable / serializable").trim_matches('"'),
+                        serde_json::to_string(&event.category).expect("EventCategory sérialisable / serializable").trim_matches('"'),
                         event.description,
-                        serde_json::to_string(&event.metadata).unwrap(),
+                        serde_json::to_string(&event.metadata).expect("Metadata sérialisable / serializable"),
                     ],
                 )
                 .map_err(|e| {
@@ -206,13 +210,13 @@ impl AuditRepository for SqliteAuditRepository {
                             event.id.as_uuid().to_string(),
                             event.timestamp.to_rfc3339(),
                             serde_json::to_string(&event.severity)
-                                .unwrap()
+                                .expect("Severity sérialisable / serializable")
                                 .trim_matches('"'),
                             serde_json::to_string(&event.category)
-                                .unwrap()
+                                .expect("EventCategory sérialisable / serializable")
                                 .trim_matches('"'),
                             event.description,
-                            serde_json::to_string(&event.metadata).unwrap(),
+                            serde_json::to_string(&event.metadata).expect("Metadata sérialisable / serializable"),
                         ])
                         .map_err(|e| {
                             DomainError::Infrastructure(format!(

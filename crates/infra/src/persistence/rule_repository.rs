@@ -36,16 +36,25 @@ impl SqliteRuleRepository {
         let updated_at_str: String = row.get(9)?;
 
         Ok(Rule {
-            id: RuleId::from_uuid(id_str.parse().unwrap()),
+            id: RuleId::from_uuid(
+                id_str.parse().expect("UUID stocké par notre code / stored by our code"),
+            ),
             name,
             priority: RulePriority::new(priority),
             enabled,
             criteria: serde_json::from_str::<RuleCriteria>(&criteria_json).unwrap_or_default(),
-            effect: serde_json::from_str::<RuleEffect>(&format!("\"{}\"", effect_str)).unwrap(),
-            scope: serde_json::from_str::<RuleScope>(&scope_json).unwrap(),
-            source: serde_json::from_str::<RuleSource>(&format!("\"{}\"", source_str)).unwrap(),
-            created_at: created_at_str.parse().unwrap(),
-            updated_at: updated_at_str.parse().unwrap(),
+            effect: serde_json::from_str::<RuleEffect>(&format!("\"{}\"", effect_str))
+                .expect("RuleEffect sérialisé par notre code / serialized by our code"),
+            scope: serde_json::from_str::<RuleScope>(&scope_json)
+                .expect("RuleScope sérialisé par notre code / serialized by our code"),
+            source: serde_json::from_str::<RuleSource>(&format!("\"{}\"", source_str))
+                .expect("RuleSource sérialisé par notre code / serialized by our code"),
+            created_at: created_at_str
+                .parse()
+                .expect("RFC3339 stocké par notre code / stored by our code"),
+            updated_at: updated_at_str
+                .parse()
+                .expect("RFC3339 stocké par notre code / stored by our code"),
         })
     }
 }
@@ -65,10 +74,10 @@ impl RuleRepository for SqliteRuleRepository {
                         rule.name,
                         rule.priority.value(),
                         rule.enabled,
-                        serde_json::to_string(&rule.criteria).unwrap(),
-                        serde_json::to_string(&rule.effect).unwrap().trim_matches('"'),
-                        serde_json::to_string(&rule.scope).unwrap(),
-                        serde_json::to_string(&rule.source).unwrap().trim_matches('"'),
+                        serde_json::to_string(&rule.criteria).expect("RuleCriteria sérialisable / serializable"),
+                        serde_json::to_string(&rule.effect).expect("RuleEffect sérialisable / serializable").trim_matches('"'),
+                        serde_json::to_string(&rule.scope).expect("RuleScope sérialisable / serializable"),
+                        serde_json::to_string(&rule.source).expect("RuleSource sérialisable / serializable").trim_matches('"'),
                         rule.created_at.to_rfc3339(),
                         rule.updated_at.to_rfc3339(),
                     ],

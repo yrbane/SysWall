@@ -40,11 +40,17 @@ impl SqlitePendingDecisionRepository {
         };
 
         Ok(PendingDecision {
-            id: PendingDecisionId::from_uuid(id_str.parse().unwrap()),
+            id: PendingDecisionId::from_uuid(
+                id_str.parse().expect("UUID stocké par notre code / stored by our code"),
+            ),
             connection_snapshot: serde_json::from_str::<ConnectionSnapshot>(&snapshot_json)
-                .unwrap(),
-            requested_at: requested_at_str.parse().unwrap(),
-            expires_at: expires_at_str.parse().unwrap(),
+                .expect("JSON sérialisé par notre code / serialized by our code"),
+            requested_at: requested_at_str
+                .parse()
+                .expect("RFC3339 stocké par notre code / stored by our code"),
+            expires_at: expires_at_str
+                .parse()
+                .expect("RFC3339 stocké par notre code / stored by our code"),
             deduplication_key,
             status,
         })
@@ -63,7 +69,7 @@ impl PendingDecisionRepository for SqlitePendingDecisionRepository {
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                     rusqlite::params![
                         request.id.as_uuid().to_string(),
-                        serde_json::to_string(&request.connection_snapshot).unwrap(),
+                        serde_json::to_string(&request.connection_snapshot).expect("ConnectionSnapshot sérialisable / serializable"),
                         request.requested_at.to_rfc3339(),
                         request.expires_at.to_rfc3339(),
                         request.deduplication_key,

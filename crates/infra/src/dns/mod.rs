@@ -32,7 +32,8 @@ impl DnsResolver {
     /// Create a new resolver with the given LRU capacity and TTL in seconds.
     /// Crée un nouveau résolveur avec la capacité LRU et le TTL en secondes donnés.
     pub fn new(capacity: usize, ttl_secs: u64) -> Self {
-        let cap = NonZeroUsize::new(capacity).unwrap_or(NonZeroUsize::new(4096).unwrap());
+        let cap = NonZeroUsize::new(capacity)
+            .unwrap_or(NonZeroUsize::new(4096).expect("4096 != 0 / non-zero constant"));
         Self {
             cache: Arc::new(Mutex::new(LruCache::new(cap))),
             ttl: Duration::from_secs(ttl_secs),

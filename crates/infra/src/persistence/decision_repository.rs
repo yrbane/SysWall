@@ -34,9 +34,9 @@ impl DecisionRepository for SqliteDecisionRepository {
                     rusqlite::params![
                         decision.id.as_uuid().to_string(),
                         decision.pending_decision_id.as_uuid().to_string(),
-                        serde_json::to_string(&decision.connection_snapshot).unwrap(),
-                        serde_json::to_string(&decision.action).unwrap().trim_matches('"'),
-                        serde_json::to_string(&decision.granularity).unwrap().trim_matches('"'),
+                        serde_json::to_string(&decision.connection_snapshot).expect("ConnectionSnapshot sérialisable / serializable"),
+                        serde_json::to_string(&decision.action).expect("DecisionAction sérialisable / serializable").trim_matches('"'),
+                        serde_json::to_string(&decision.granularity).expect("DecisionGranularity sérialisable / serializable").trim_matches('"'),
                         decision.decided_at.to_rfc3339(),
                         decision.generated_rule.map(|r| r.as_uuid().to_string()),
                     ],

@@ -172,7 +172,7 @@ impl NftablesFirewallAdapter {
     /// Tente un retour arriere vers un etat precedent.
     async fn rollback(&self, state: &RollbackState) {
         perform_rollback_static(state, &self.config).await;
-        *self.nftables_synced.lock().unwrap() = false;
+        *self.nftables_synced.lock().expect("Mutex jamais empoisonné / never poisoned") = false;
     }
 }
 
@@ -347,7 +347,7 @@ impl FirewallEngine for NftablesFirewallAdapter {
 
         self.handle_map
             .lock()
-            .unwrap()
+            .expect("Mutex jamais empoisonné / never poisoned")
             .insert(rule.id, new_handles);
 
         info!(
@@ -386,7 +386,7 @@ impl FirewallEngine for NftablesFirewallAdapter {
     /// Remove a rule from nftables by its domain ID.
     /// Supprime une regle de nftables par son identifiant du domaine.
     async fn remove_rule(&self, rule_id: &RuleId) -> Result<(), DomainError> {
-        let handles = self.handle_map.lock().unwrap().remove(rule_id);
+        let handles = self.handle_map.lock().expect("Mutex jamais empoisonné / never poisoned").remove(rule_id);
 
         let handles = match handles {
             Some(h) => h,
@@ -530,8 +530,8 @@ impl FirewallEngine for NftablesFirewallAdapter {
                 new_handle_map.insert(rule_id, handles);
             }
         }
-        *self.handle_map.lock().unwrap() = new_handle_map;
-        *self.nftables_synced.lock().unwrap() = true;
+        *self.handle_map.lock().expect("Mutex jamais empoisonné / never poisoned") = new_handle_map;
+        *self.nftables_synced.lock().expect("Mutex jamais empoisonné / never poisoned") = true;
 
         info!(
             "nftables sync complete: removed {}, added {}",
@@ -570,7 +570,7 @@ impl FirewallEngine for NftablesFirewallAdapter {
     /// Get the current firewall status.
     /// Retourne l'etat actuel du pare-feu.
     async fn get_status(&self) -> Result<FirewallStatus, DomainError> {
-        let synced = *self.nftables_synced.lock().unwrap();
+        let synced = *self.nftables_synced.lock().expect("Mutex jamais empoisonné / never poisoned");
 
         let json = self
             .execute_nft(&NftCommandBuilder::list_table(&self.config.table_name))

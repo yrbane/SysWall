@@ -63,8 +63,8 @@ impl ConntrackMonitorAdapter {
 /// Detecte les adresses IP locales en lisant les interfaces reseau.
 fn detect_local_ips() -> Vec<IpAddr> {
     let mut ips = vec![
-        "127.0.0.1".parse::<IpAddr>().unwrap(),
-        "::1".parse::<IpAddr>().unwrap(),
+        "127.0.0.1".parse::<IpAddr>().expect("littéral IPv4 valide / valid IPv4 literal"),
+        "::1".parse::<IpAddr>().expect("littéral IPv6 valide / valid IPv6 literal"),
     ];
 
     // Use nix::ifaddrs to get interface addresses
