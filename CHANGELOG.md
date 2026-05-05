@@ -74,3 +74,16 @@ Dependances Cargo ajoutees : `nfq = "0.2.5"`, `etherparse = "0.20"` (workspace, 
 - **Toast extensible** : nouveau champ `action?: { label, handler }` + barre de progression visuelle.
 
 Nouveaux utilitaires : `crates/ui/src/lib/utils/debounce.ts`, `crates/ui/src/lib/actions/focus_trap.ts`.
+
+### Design Polish
+
+- **Direction artistique tranchee** : macOS Dark conserve, accent identitaire SysWall `#2cd4d4` (cyan turquoise) reserve aux moments-cles (logo, killswitch actif, filet d'interception).
+- **Web fonts auto-hostees** : Inter Variable + JetBrains Mono dans `crates/ui/static/fonts/`. `font-display: swap`.
+- **Logo SysWall SVG** : composant `SyswallLogo.svelte` (mark + wordmark) + `favicon.svg`.
+- **Icones Lucide** : remplacement des emojis sidebar (LayoutDashboard, Network, Shield, BrainCircuit, Ban, ClipboardList, Settings).
+- **Polish tableaux denses** : zebra-striping (`--bg-row-stripe`), sticky header shadow au scroll, `font-variant-numeric: tabular-nums` global, hover de ligne plus marque (`--bg-row-hover`).
+- **`StatCard:hover`** : translation 1 px + ombre.
+- **`Input`** : etats `error` (bordure rouge + helper text) et `disabled` (opacite 0.5).
+- **Card** : prop `glow` retiree (YAGNI).
+- **Pulsation killswitch** : 2 s ease-in-out cyan quand le reseau est actif. Desactivee sous `prefers-reduced-motion: reduce`.
+- **Tokens** : `--accent-syswall`, `--accent-syswall-dim`, `--accent-syswall-glow`, `--bg-row-hover`, `--bg-row-stripe`, `--shadow-sticky-header`.
