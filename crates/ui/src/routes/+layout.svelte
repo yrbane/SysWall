@@ -120,7 +120,13 @@
         <h1 class="topbar-title">{currentTitle}</h1>
         <div class="topbar-spacer"></div>
 
-        <button class="killswitch-pill" class:disabled={!networkEnabled} onclick={toggleNetwork}>
+        <button
+          class="killswitch-pill"
+          class:disabled={!networkEnabled}
+          class:active={networkEnabled}
+          class:killswitch-active-pulse={networkEnabled}
+          onclick={toggleNetwork}
+        >
           <span class="killswitch-dot" class:active={networkEnabled}></span>
           <span class="killswitch-label">
             {networkEnabled ? 'Réseau actif' : 'Réseau coupé'}
@@ -206,6 +212,20 @@
   .killswitch-pill.disabled {
     background: var(--accent-red-15);
     border-color: rgba(255, 69, 58, 0.2);
+  }
+
+  /* Pulsation cyan identitaire quand le réseau est actif / Cyan identity pulse when network is active */
+  .killswitch-pill.active {
+    box-shadow: var(--accent-syswall-glow);
+  }
+
+  @keyframes killswitch-pulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(44, 212, 212, 0.4); }
+    50%       { box-shadow: 0 0 10px rgba(44, 212, 212, 0.6); }
+  }
+
+  .killswitch-active-pulse {
+    animation: killswitch-pulse 2s ease-in-out infinite;
   }
 
   .killswitch-pill:hover {
