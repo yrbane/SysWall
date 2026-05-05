@@ -6,6 +6,9 @@ use syswall_domain::events::DefaultPolicy;
 
 /// Top-level SysWall daemon configuration.
 /// Configuration principale du démon SysWall.
+// Les champs de configuration sont désérialisés depuis TOML ; tous doivent être présents
+// même si certains ne sont pas encore lus dans le code courant.
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct SysWallConfig {
     pub config_version: u32,
@@ -23,6 +26,9 @@ pub struct SysWallConfig {
 
 /// Daemon runtime configuration (socket, logging, watchdog).
 /// Configuration d'exécution du démon (socket, journalisation, chien de garde).
+// log_level, log_dir, watchdog_interval_secs : présents dans le fichier de configuration
+// mais pas encore consommés dans le code courant (réservés pour l'initialisation du journal).
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct DaemonConfig {
     pub socket_path: PathBuf,
@@ -43,6 +49,8 @@ pub struct DatabaseConfig {
 
 /// Firewall configuration (default policy, rollback, nftables).
 /// Configuration du pare-feu (politique par défaut, retour arrière, nftables).
+// rollback_timeout_secs : présent dans la config TOML, prévu pour le mécanisme de rollback.
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct FirewallConfig {
     pub default_policy: DefaultPolicyConfig,
@@ -141,6 +149,9 @@ fn default_conntrack_protocols() -> Vec<String> {
 
 /// Learning mode configuration (debounce, timeouts, overflow).
 /// Configuration du mode d'apprentissage (anti-rebond, délais, débordement).
+// enabled, debounce_window_secs, default_timeout_action, overflow_action : lus depuis TOML,
+// transmis au LearningService via AppLearningConfig ; les champs non encore relus ici sont intentionnels.
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct LearningConfig {
     pub enabled: bool,
@@ -153,6 +164,8 @@ pub struct LearningConfig {
 
 /// UI configuration (locale, theme, refresh rate).
 /// Configuration de l'interface utilisateur (locale, thème, fréquence de rafraîchissement).
+// locale, theme, refresh_interval_ms : présents dans le TOML, transmis à l'UI via gRPC dans le futur.
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct UiConfig {
     pub locale: String,

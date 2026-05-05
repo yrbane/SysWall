@@ -1,6 +1,5 @@
 /// gRPC event streaming service implementing the SysWallEvents trait.
 /// Service de streaming d'événements gRPC implémentant le trait SysWallEvents.
-
 use std::sync::Arc;
 
 use tokio_stream::wrappers::BroadcastStream;

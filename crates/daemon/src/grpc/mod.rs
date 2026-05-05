@@ -1,6 +1,5 @@
 /// gRPC service modules for the SysWall daemon.
 /// Modules de services gRPC pour le démon SysWall.
-
 pub mod control_service;
 pub mod converters;
 pub mod event_service;

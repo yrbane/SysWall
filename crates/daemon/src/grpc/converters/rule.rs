@@ -40,6 +40,8 @@ pub fn rule_to_proto(rule: &Rule) -> RuleMessage {
 
 /// Convert a proto CreateRuleRequest to a domain CreateRuleCommand.
 /// Convertit une CreateRuleRequest proto en CreateRuleCommand du domaine.
+// tonic::Status est imposé par l'API gRPC ; taille inévitable.
+#[allow(clippy::result_large_err)]
 pub fn proto_to_create_rule_cmd(
     req: &CreateRuleRequest,
 ) -> Result<CreateRuleCommand, tonic::Status> {

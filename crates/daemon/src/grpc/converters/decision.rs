@@ -28,6 +28,8 @@ pub fn pending_decision_to_proto(pd: &PendingDecision) -> PendingDecisionMessage
 
 /// Convert a proto DecisionResponseRequest to a domain RespondToDecisionCommand.
 /// Convertit une DecisionResponseRequest proto en RespondToDecisionCommand du domaine.
+// tonic::Status est imposé par l'API gRPC ; taille inévitable.
+#[allow(clippy::result_large_err)]
 pub fn proto_to_respond_cmd(
     req: &DecisionResponseRequest,
 ) -> Result<RespondToDecisionCommand, tonic::Status> {

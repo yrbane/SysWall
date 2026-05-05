@@ -58,6 +58,8 @@ impl Supervisor {
 
     /// Return a clone of the cancellation token.
     /// Retourne un clone du jeton d'annulation.
+    // Méthode publique utilitaire conservée pour les futurs appelants (signal handlers, tests).
+    #[allow(dead_code)]
     pub fn cancel_token(&self) -> CancellationToken {
         self.cancel.clone()
     }

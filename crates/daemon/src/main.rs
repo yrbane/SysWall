@@ -259,10 +259,10 @@ async fn run() -> Result<(), StartupError> {
                     result = receiver.recv() => {
                         match result {
                             Ok(event) => {
-                                if let Some(audit_event) = AuditService::domain_event_to_audit(&event) {
-                                    if let Err(e) = writer.buffer_event(audit_event).await {
-                                        warn!("Audit listener: failed to buffer event: {}", e);
-                                    }
+                                if let Some(audit_event) = AuditService::domain_event_to_audit(&event)
+                                    && let Err(e) = writer.buffer_event(audit_event).await
+                                {
+                                    warn!("Audit listener: failed to buffer event: {}", e);
                                 }
                             }
                             Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {

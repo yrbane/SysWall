@@ -1,6 +1,5 @@
 /// gRPC server setup with Unix socket transport and SO_PEERCRED auth.
 /// Configuration du serveur gRPC avec transport Unix et auth SO_PEERCRED.
-
 use std::collections::HashSet;
 use std::os::fd::AsFd;
 use std::path::PathBuf;

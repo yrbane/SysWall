@@ -99,7 +99,7 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
         let al_cfg = config
             .antilockout
             .clone()
-            .unwrap_or_else(crate::config::AntilockoutConfig::default);
+            .unwrap_or_default();
 
         let nft_adapter = if al_cfg.enabled {
             let endpoints: Result<Vec<SocketAddr>, _> = al_cfg

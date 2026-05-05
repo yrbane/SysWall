@@ -1,6 +1,5 @@
 /// Proto <-> domain type converters for gRPC services.
 /// Convertisseurs de types proto <-> domaine pour les services gRPC.
-
 mod audit;
 mod decision;
 mod error;

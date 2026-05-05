@@ -1,6 +1,5 @@
 /// gRPC control service implementing the SysWallControl trait.
 /// Service de contrôle gRPC implémentant le trait SysWallControl.
-
 use std::sync::Arc;
 
 use tonic::{Request, Response, Status};

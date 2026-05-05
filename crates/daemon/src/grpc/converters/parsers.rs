@@ -7,6 +7,8 @@ use syswall_domain::entities::{
 
 /// Parse a string to a Severity enum.
 /// Analyse une chaîne vers l'énumération Severity.
+// tonic::Status est imposé par l'API gRPC ; taille inévitable.
+#[allow(clippy::result_large_err)]
 pub(super) fn parse_severity(s: &str) -> Result<Severity, tonic::Status> {
     match s {
         "Debug" => Ok(Severity::Debug),
@@ -23,6 +25,8 @@ pub(super) fn parse_severity(s: &str) -> Result<Severity, tonic::Status> {
 
 /// Parse a string to an EventCategory enum.
 /// Analyse une chaîne vers l'énumération EventCategory.
+// tonic::Status est imposé par l'API gRPC ; taille inévitable.
+#[allow(clippy::result_large_err)]
 pub(super) fn parse_event_category(s: &str) -> Result<EventCategory, tonic::Status> {
     match s {
         "Connection" => Ok(EventCategory::Connection),
@@ -41,6 +45,8 @@ pub(super) fn parse_event_category(s: &str) -> Result<EventCategory, tonic::Stat
 
 /// Parse a string to a RuleEffect enum.
 /// Analyse une chaîne vers l'énumération RuleEffect.
+// tonic::Status est imposé par l'API gRPC ; taille inévitable.
+#[allow(clippy::result_large_err)]
 pub(super) fn parse_rule_effect(s: &str) -> Result<RuleEffect, tonic::Status> {
     match s {
         "allow" => Ok(RuleEffect::Allow),
@@ -56,6 +62,8 @@ pub(super) fn parse_rule_effect(s: &str) -> Result<RuleEffect, tonic::Status> {
 
 /// Parse a string to a RuleSource enum.
 /// Analyse une chaîne vers l'énumération RuleSource.
+// tonic::Status est imposé par l'API gRPC ; taille inévitable.
+#[allow(clippy::result_large_err)]
 pub(super) fn parse_rule_source(s: &str) -> Result<RuleSource, tonic::Status> {
     match s {
         "manual" => Ok(RuleSource::Manual),
@@ -71,6 +79,8 @@ pub(super) fn parse_rule_source(s: &str) -> Result<RuleSource, tonic::Status> {
 
 /// Parse a string to a DecisionAction enum.
 /// Analyse une chaîne vers l'énumération DecisionAction.
+// tonic::Status est imposé par l'API gRPC ; taille inévitable.
+#[allow(clippy::result_large_err)]
 pub(super) fn parse_decision_action(s: &str) -> Result<DecisionAction, tonic::Status> {
     match s {
         "allow_once" => Ok(DecisionAction::AllowOnce),
@@ -88,6 +98,8 @@ pub(super) fn parse_decision_action(s: &str) -> Result<DecisionAction, tonic::St
 
 /// Parse a string to a DecisionGranularity enum.
 /// Analyse une chaîne vers l'énumération DecisionGranularity.
+// tonic::Status est imposé par l'API gRPC ; taille inévitable.
+#[allow(clippy::result_large_err)]
 pub(super) fn parse_decision_granularity(s: &str) -> Result<DecisionGranularity, tonic::Status> {
     match s {
         "app_only" => Ok(DecisionGranularity::AppOnly),
