@@ -185,6 +185,20 @@ async fn run_guard_loop(
     let _ = audit.append(&event).await;
 }
 
+#[async_trait::async_trait]
+impl syswall_domain::ports::connectivity::LockoutGuard for AntilockoutGuard {
+    async fn arm_rollback(
+        &self,
+        rolled_back_count: usize,
+        rollback: syswall_domain::ports::connectivity::ArmedRollback,
+    ) -> Result<(), DomainError> {
+        let rb: RollbackFn = Box::new(move || rollback());
+        self.arm(rolled_back_count, rb)
+            .await
+            .map_err(|e| DomainError::Infrastructure(format!("guard: {e}")))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -301,6 +315,17 @@ mod tests {
         }
         assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 0);
         assert!(!guard.is_armed().await);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lockout_guard_port_arm_rollback_delegates_to_arm() {
+        use syswall_domain::ports::connectivity::{ArmedRollback, LockoutGuard};
+        let probe = Arc::new(FakeConnectivityProbe::always_reachable());
+        let audit = Arc::new(FakeAuditRepository::new());
+        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default());
+        let rb: ArmedRollback = Box::new(|| Box::pin(async { Ok(()) }));
+        let res = LockoutGuard::arm_rollback(&guard, 1, rb).await;
+        assert!(res.is_ok());
     }
 
     #[tokio::test(start_paused = true)]

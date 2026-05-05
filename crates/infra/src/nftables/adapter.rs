@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -51,6 +51,7 @@ pub struct NftablesFirewallAdapter {
     handle_map: Mutex<HandleMap>,
     started_at: Instant,
     nftables_synced: Mutex<bool>,
+    lockout_guard: Option<Arc<dyn syswall_domain::ports::connectivity::LockoutGuard>>,
 }
 
 impl std::fmt::Debug for NftablesFirewallAdapter {
@@ -79,7 +80,18 @@ impl NftablesFirewallAdapter {
             handle_map: Mutex::new(HandleMap::new()),
             started_at: Instant::now(),
             nftables_synced: Mutex::new(false),
+            lockout_guard: None,
         })
+    }
+
+    /// Attache un guard anti-lockout à l'adaptateur.
+    /// Attach a lockout guard to the adapter.
+    pub fn with_lockout_guard(
+        mut self,
+        guard: Arc<dyn syswall_domain::ports::connectivity::LockoutGuard>,
+    ) -> Self {
+        self.lockout_guard = Some(guard);
+        self
     }
 
     /// Execute an nft command and return stdout on success.
@@ -159,33 +171,83 @@ impl NftablesFirewallAdapter {
     /// Attempt to rollback to a previous state.
     /// Tente un retour arriere vers un etat precedent.
     async fn rollback(&self, state: &RollbackState) {
-        warn!("Attempting nftables rollback...");
-        // Delete the table and re-create from saved state
-        let delete_cmd = NftCommandBuilder::new()
-            .arg("delete")
-            .arg("table")
-            .arg("inet")
-            .arg(&self.config.table_name);
+        perform_rollback_static(state, &self.config).await;
+        *self.nftables_synced.lock().unwrap() = false;
+    }
+}
 
-        if let Err(e) = self.execute_nft(&delete_cmd).await {
-            error!("Rollback: failed to delete table: {}", e);
-        }
+/// Effectue le rollback nftables à partir de l'état sauvegardé et de la config.
+/// Performs nftables rollback from saved state and config (callable from static closures).
+async fn perform_rollback_static(state: &RollbackState, config: &NftablesConfig) {
+    warn!("Attempting nftables rollback...");
+    let delete_cmd = NftCommandBuilder::new()
+        .arg("delete")
+        .arg("table")
+        .arg("inet")
+        .arg(&config.table_name);
 
-        // If we had a saved state, attempt to restore it
-        if !state.table_state.is_empty() {
-            let _restore_cmd = NftCommandBuilder::new().arg("-j").arg("-f").arg("-");
-            // Note: In production, we would pipe the saved JSON to stdin.
-            // For now, we log the failure and set degraded mode.
-            warn!(
-                "Rollback state saved at {:?} (age: {:?})",
-                state.saved_at,
-                state.saved_at.elapsed()
+    let output = tokio::time::timeout(delete_cmd.timeout(), async {
+        tokio::process::Command::new(&config.nft_binary_path)
+            .args(delete_cmd.args())
+            .output()
+            .await
+    })
+    .await;
+
+    match output {
+        Ok(Ok(o)) if o.status.success() => {}
+        Ok(Ok(o)) => {
+            error!(
+                "Rollback: failed to delete table: {}",
+                String::from_utf8_lossy(&o.stderr)
             );
         }
-
-        *self.nftables_synced.lock().unwrap() = false;
-        error!("nftables rollback completed -- adapter in degraded mode");
+        Ok(Err(e)) => error!("Rollback: nft exec error: {}", e),
+        Err(_) => error!("Rollback: nft command timed out"),
     }
+
+    if !state.table_state.is_empty() {
+        warn!(
+            "Rollback state saved at {:?} (age: {:?})",
+            state.saved_at,
+            state.saved_at.elapsed()
+        );
+    }
+
+    error!("nftables rollback completed -- adapter in degraded mode");
+}
+
+/// Retourne true si toutes les règles sont whitelist (DNS/DHCP/NTP/loopback) — bypass du guard.
+/// Returns true if all rules are whitelist (DNS/DHCP/NTP/loopback) — bypass the guard.
+fn is_whitelist_only(rules: &[Rule]) -> bool {
+    !rules.is_empty() && rules.iter().all(is_whitelist_rule)
+}
+
+fn is_whitelist_rule(rule: &Rule) -> bool {
+    use syswall_domain::entities::IpMatcher;
+    use syswall_domain::value_objects::Protocol;
+    let crit = &rule.criteria;
+    let port_match = |p: u16| {
+        let matches_matcher = |m: &syswall_domain::entities::PortMatcher| match m {
+            syswall_domain::entities::PortMatcher::Exact(port) => port.value() == p,
+            syswall_domain::entities::PortMatcher::Range { start, end } => {
+                start.value() <= p && p <= end.value()
+            }
+        };
+        crit.remote_port.as_ref().is_some_and(matches_matcher)
+            || crit.local_port.as_ref().is_some_and(matches_matcher)
+    };
+    let proto_is = |p: Protocol| crit.protocol == Some(p);
+    let is_loopback = crit.remote_ip.as_ref().is_some_and(|ip| match ip {
+        IpMatcher::Exact(addr) => addr.is_loopback(),
+        IpMatcher::Cidr { network, .. } => network.is_loopback(),
+        IpMatcher::Range { start, end } => start.is_loopback() && end.is_loopback(),
+    });
+    (proto_is(Protocol::Udp) && port_match(53))
+        || (proto_is(Protocol::Tcp) && port_match(53))
+        || (proto_is(Protocol::Udp) && (port_match(67) || port_match(68)))
+        || (proto_is(Protocol::Udp) && port_match(123))
+        || is_loopback
 }
 
 #[async_trait]
@@ -252,7 +314,7 @@ impl FirewallEngine for NftablesFirewallAdapter {
             None => return Ok(()),
         };
 
-        let rollback_state = self.save_rollback_state().await?;
+        let rollback_state = Arc::new(self.save_rollback_state().await?);
         let mut new_handles = Vec::new();
 
         for chain in &translated.chains {
@@ -278,7 +340,7 @@ impl FirewallEngine for NftablesFirewallAdapter {
                         e
                     );
                     // Rollback any rules added in this call
-                    self.rollback(&rollback_state).await;
+                    self.rollback(&*rollback_state).await;
                     return Err(e);
                 }
             }
@@ -294,6 +356,26 @@ impl FirewallEngine for NftablesFirewallAdapter {
             rule.id.as_uuid(),
             translated.chains.len()
         );
+
+        // Arme le guard anti-lockout après application réussie (bypass si règle whitelist).
+        // Arm the lockout guard after successful apply (bypass for whitelist rules).
+        if let Some(guard) = &self.lockout_guard {
+            if !is_whitelist_rule(rule) {
+                let snapshot = Arc::clone(&rollback_state);
+                let config = self.config.clone();
+                let rollback: syswall_domain::ports::connectivity::ArmedRollback =
+                    Box::new(move || {
+                        Box::pin(async move {
+                            perform_rollback_static(&snapshot, &config).await;
+                            Ok(())
+                        })
+                    });
+                guard.arm_rollback(1, rollback).await?;
+            } else {
+                tracing::warn!(target: "antilockout", "guard bypass: whitelist-only ruleset");
+            }
+        }
+
         Ok(())
     }
 
@@ -341,7 +423,7 @@ impl FirewallEngine for NftablesFirewallAdapter {
         info!("Starting nftables sync with {} rules", rules.len());
 
         self.ensure_table_and_chains().await?;
-        let rollback_state = self.save_rollback_state().await?;
+        let rollback_state = Arc::new(self.save_rollback_state().await?);
 
         // List current nft rules
         let json = self
@@ -402,7 +484,7 @@ impl FirewallEngine for NftablesFirewallAdapter {
                     );
                     if let Err(e) = self.execute_nft(&cmd).await {
                         error!("Sync: failed to remove stale rule {}: {}", uuid, e);
-                        self.rollback(&rollback_state).await;
+                        self.rollback(&*rollback_state).await;
                         return Err(e);
                     }
                 }
@@ -414,7 +496,7 @@ impl FirewallEngine for NftablesFirewallAdapter {
         for rule in &to_add {
             if let Err(e) = self.apply_rule(rule).await {
                 error!("Sync: failed to add rule {}: {}", rule.id.as_uuid(), e);
-                self.rollback(&rollback_state).await;
+                self.rollback(&*rollback_state).await;
                 return Err(e);
             }
         }
@@ -452,6 +534,27 @@ impl FirewallEngine for NftablesFirewallAdapter {
             to_remove.len(),
             to_add.len()
         );
+
+        // Arme le guard anti-lockout après synchronisation réussie (bypass si whitelist seulement).
+        // Arm the lockout guard after successful sync (bypass for whitelist-only rulesets).
+        if let Some(guard) = &self.lockout_guard {
+            if !is_whitelist_only(rules) {
+                let snapshot = Arc::clone(&rollback_state);
+                let config = self.config.clone();
+                let count = rules.len();
+                let rollback: syswall_domain::ports::connectivity::ArmedRollback =
+                    Box::new(move || {
+                        Box::pin(async move {
+                            perform_rollback_static(&snapshot, &config).await;
+                            Ok(())
+                        })
+                    });
+                guard.arm_rollback(count, rollback).await?;
+            } else {
+                tracing::warn!(target: "antilockout", "guard bypass: whitelist-only ruleset");
+            }
+        }
+
         Ok(())
     }
 
@@ -493,6 +596,71 @@ impl FirewallEngine for NftablesFirewallAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
+    use syswall_domain::entities::{RuleEffect, RuleScope, RuleSource, RuleCriteria, RuleId};
+    use syswall_domain::value_objects::{Protocol, RulePriority};
+
+    /// Construit une Rule de test avec protocole et ports optionnels.
+    /// Builds a test Rule with optional protocol and ports.
+    fn build_test_rule(
+        protocol: Option<Protocol>,
+        remote_port: Option<u16>,
+        local_port: Option<u16>,
+        remote_ip: Option<syswall_domain::entities::IpMatcher>,
+    ) -> Rule {
+        use syswall_domain::entities::PortMatcher;
+        use syswall_domain::value_objects::Port;
+        Rule {
+            id: RuleId::new(),
+            name: "whitelist test rule".to_string(),
+            priority: RulePriority::new(100),
+            enabled: true,
+            criteria: RuleCriteria {
+                protocol,
+                remote_port: remote_port
+                    .map(|p| PortMatcher::Exact(Port::new(p).unwrap())),
+                local_port: local_port
+                    .map(|p| PortMatcher::Exact(Port::new(p).unwrap())),
+                remote_ip,
+                ..Default::default()
+            },
+            effect: RuleEffect::Allow,
+            scope: RuleScope::Permanent,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source: RuleSource::Manual,
+        }
+    }
+
+    #[test]
+    fn whitelist_dns_udp() {
+        let rule = build_test_rule(Some(Protocol::Udp), Some(53), None, None);
+        assert!(super::is_whitelist_rule(&rule));
+    }
+
+    #[test]
+    fn whitelist_dns_tcp() {
+        let rule = build_test_rule(Some(Protocol::Tcp), Some(53), None, None);
+        assert!(super::is_whitelist_rule(&rule));
+    }
+
+    #[test]
+    fn whitelist_dhcp_67() {
+        let rule = build_test_rule(Some(Protocol::Udp), Some(67), None, None);
+        assert!(super::is_whitelist_rule(&rule));
+    }
+
+    #[test]
+    fn whitelist_ntp() {
+        let rule = build_test_rule(Some(Protocol::Udp), Some(123), None, None);
+        assert!(super::is_whitelist_rule(&rule));
+    }
+
+    #[test]
+    fn whitelist_random_port_is_not_whitelist() {
+        let rule = build_test_rule(Some(Protocol::Tcp), Some(443), None, None);
+        assert!(!super::is_whitelist_rule(&rule));
+    }
 
     #[test]
     fn nftables_config_default_values() {
