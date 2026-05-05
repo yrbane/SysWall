@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use syswall_domain::entities::{AuditEvent, AuditStats};
 use syswall_domain::errors::DomainError;
@@ -11,6 +12,7 @@ use syswall_domain::ports::{AuditFilters, AuditRepository};
 /// Dépôt factice en mémoire des événements d'audit pour les tests.
 pub struct FakeAuditRepository {
     pub events: Mutex<Vec<AuditEvent>>,
+    delete_before_count: Arc<AtomicUsize>,
 }
 
 impl Default for FakeAuditRepository {
@@ -23,7 +25,14 @@ impl FakeAuditRepository {
     pub fn new() -> Self {
         Self {
             events: Mutex::new(vec![]),
+            delete_before_count: Arc::new(AtomicUsize::new(0)),
         }
+    }
+
+    /// Retourne le nombre d'appels à `delete_before` depuis la création (pour les assertions de test).
+    /// Returns the number of calls to `delete_before` since creation (for test assertions).
+    pub fn delete_before_call_count(&self) -> usize {
+        self.delete_before_count.load(Ordering::SeqCst)
     }
 
     /// Retourne une copie de tous les événements stockés (pour les assertions de test).
@@ -108,6 +117,7 @@ impl AuditRepository for FakeAuditRepository {
         &self,
         before: chrono::DateTime<chrono::Utc>,
     ) -> Result<u64, DomainError> {
+        self.delete_before_count.fetch_add(1, Ordering::SeqCst);
         let mut events = self.events.lock().unwrap();
         let original_len = events.len();
         events.retain(|e| e.timestamp >= before);
