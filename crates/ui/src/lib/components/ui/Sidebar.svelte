@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import SyswallLogo from '$lib/components/branding/SyswallLogo.svelte';
 
   interface NavItem {
     label: string;
@@ -26,8 +27,7 @@
 <nav class="sidebar" aria-label="Navigation principale">
   <!-- Logo -->
   <div class="sidebar-logo">
-    <div class="logo-icon">🛡️</div>
-    <span class="logo-text">SysWall</span>
+    <SyswallLogo variant="full" size={20} />
   </div>
 
   <!-- Navigation principale / Main navigation -->
@@ -89,22 +89,9 @@
     gap: 8px;
   }
 
-  .logo-icon {
-    width: 26px;
-    height: 26px;
-    border-radius: 6px;
-    background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-  }
-
-  .logo-text {
-    font-size: 13px;
-    font-weight: 600;
+  .sidebar-logo :global(svg) {
+    /* Logotype SysWall — hérité de currentColor pour le texte */
     color: var(--text-primary);
-    letter-spacing: -0.2px;
   }
 
   /* --- Navigation items --- */
