@@ -52,9 +52,21 @@
   --glass-border: rgba(255, 255, 255, 0.06);
   --glass-blur: 20px;
 
-  /* Typography — system fonts macOS */
-  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  /* Identity accent (sous-projet E) */
+  --accent-syswall: #2cd4d4;
+  --accent-syswall-dim: rgba(44, 212, 212, 0.4);
+  --accent-syswall-glow: 0 0 6px rgba(44, 212, 212, 0.4);
+
+  /* Hover bumped pour les tableaux denses */
+  --bg-row-hover: rgba(255, 255, 255, 0.10);
+  --bg-row-stripe: rgba(255, 255, 255, 0.02);
+
+  /* Ombre sticky-header */
+  --shadow-sticky-header: 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* Typography — web fonts auto-hostees avec fallback système */
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
   --font-size-xs: 0.6875rem;   /* 11px */
   --font-size-sm: 0.8125rem;   /* 13px */
@@ -263,4 +275,14 @@ body {
 ::selection {
   background: var(--accent-cyan-15);
   color: var(--accent-blue);
+}
+
+/* Chiffres tabulaires sur les cellules mono et numériques */
+.mono, td, .number {
+  font-variant-numeric: tabular-nums;
+}
+
+/* prefers-reduced-motion : neutralise la pulsation killswitch */
+@media (prefers-reduced-motion: reduce) {
+  .killswitch-active-pulse { animation: none !important; }
 }
