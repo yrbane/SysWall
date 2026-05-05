@@ -3,6 +3,36 @@
 Toutes les modifications notables seront documentees ici.
 All notable changes documented here.
 
+## [0.3.0] - 2026-05-05
+
+Version de stabilisation post-V0.2 : finition technique, hardening CI, polish.
+
+### Added / Ajoute
+
+- **Action `Defer` reelle sur popup decision** : nouvelle variante `DecisionAction::Defer { duration_secs: u64 }` qui snooze la `dedup_key` en memoire pendant N secondes (1..=86400). Les nouveaux flux matchant retombent sur Drop sans popup, puis la decision se re-declenche apres expiration. Raccourci UI `Esc` -> `defer:300` (5 min). Parser gRPC `defer:N` avec validation des bornes.
+- **`VerdictWaitError` typed** : remplace le silent fallback `Ok(Drop)` dans `wait_for_verdict` par 3 variantes typees (`Timeout`, `ChannelClosed`, `ChannelLagged { missed }`). Audit dedie par variante avec severity adaptee (Warning timeout, Error channel) et metadata `wait_error` machine-readable.
+- **Benches Criterion** : `crates/infra/benches/nfq_parser_bench.rs` (parsing IPv4/IPv6 TCP/UDP : ~160-465 ns/paquet) et `crates/app/benches/dedup_key_bench.rs` (~360 ns/call). Le bench `policy_bench.rs` preexiste.
+- **Real gRPC test harness** : `crates/daemon/tests/grpc_limits_test.rs` n'est plus un squelette. `message_over_1mib_is_rejected` envoie 2 MiB et verifie `OutOfRange` ; `small_message_is_accepted` valide le happy path. `concurrency_limit_is_enforced` reste TODO V0.4.
+- **`cargo deny` en CI** : nouveau `deny.toml` (whitelist licenses MIT/Apache-2/BSD/ISC/Zlib/MPL-2/Unicode-3.0/CC0/0BSD), 17 RUSTSEC ignorees ligne par ligne pour les unmaintained transitives Tauri/GTK/wry. Job `deny` dans CI via `EmbarkStudios/cargo-deny-action@v2`.
+- **Jobs CI dedie** : `grpc-integration` (env `SYSWALL_TEST_GRPC=1`, sans privileges) et `nfqueue-smoke` (sudo + modprobe nfnetlink_queue, `continue-on-error: true` car le runner peut ne pas avoir CAP_NET_ADMIN).
+
+### Changed / Modifie
+
+- **Version workspace** bumpee `0.2.0 -> 0.3.0`. La nouvelle variante `DecisionAction::Defer { .. }` est techniquement breaking pour les clients gRPC qui font un match exhaustif, justifiant le bump minor.
+- **Tests sortis des god-files infra** : `crates/infra/src/nftables/translator/mod.rs` 511 -> 113 LOC (production-only) ; `crates/infra/src/nftables/adapter/mod.rs` 717 -> 606 LOC. Tests deplaces dans `tests.rs` siblings via `#[cfg(test)] mod tests;` (preserve la visibilite `pub(super)`).
+- **License declaree** explicitement sur tous les crates du workspace (via `license.workspace = true`) plus `crates/ebpf-prog` et `crates/ui/src-tauri` (license = "MIT" direct car hors workspace ou config differente).
+
+### Documentation
+
+- **`docs/roadmap-2026-2027.md`** : roadmap V0.3 -> V1.0 sur 6-9 mois (Stabilization, UX+i18n, Packaging, Ecosysteme).
+- **GitHub Release V0.2.0** publiee avec corps structure (highlights, prerequis, CHANGELOG complet).
+
+### Notes
+
+V0.3.6 (logo final designe pro) reste externe : le logo SVG livre en V0.2.0 est un placeholder propre (bouclier + filet d'interception) ; la finalisation par un graphiste reste a programmer.
+
+---
+
 ## [0.2.0] - 2026-05-05
 
 ### Added / Ajoute

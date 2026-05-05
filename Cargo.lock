@@ -4303,7 +4303,7 @@ dependencies = [
 
 [[package]]
 name = "syswall-app"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4321,7 +4321,7 @@ dependencies = [
 
 [[package]]
 name = "syswall-daemon"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4339,6 +4339,7 @@ dependencies = [
  "syswall-ebpf",
  "syswall-infra",
  "syswall-proto",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
@@ -4353,7 +4354,7 @@ dependencies = [
 
 [[package]]
 name = "syswall-domain"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4370,7 +4371,7 @@ dependencies = [
 
 [[package]]
 name = "syswall-ebpf"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "aya",
@@ -4384,10 +4385,11 @@ dependencies = [
 
 [[package]]
 name = "syswall-infra"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "criterion",
  "dashmap",
  "dirs",
  "dns-lookup",
@@ -4410,7 +4412,7 @@ dependencies = [
 
 [[package]]
 name = "syswall-proto"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "prost",
  "prost-types",
