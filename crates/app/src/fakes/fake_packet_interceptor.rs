@@ -2,14 +2,11 @@ use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
 use tokio_util::sync::CancellationToken;
 
-use syswall_domain::entities::{
-    Connection, ConnectionId, ConnectionState, ConnectionVerdict, ProcessInfo, SystemUser,
-};
+use syswall_domain::entities::Connection;
 use syswall_domain::errors::DomainError;
 use syswall_domain::ports::interception::{
     PacketDecisionHandler, PacketInterceptor, PacketVerdict,
 };
-use syswall_domain::value_objects::{Direction, Port, Protocol, SocketAddress};
 
 /// Programmable fake `PacketInterceptor` for tests.
 /// Fake programmable du `PacketInterceptor` pour les tests.
@@ -79,6 +76,10 @@ impl PacketInterceptor for FakePacketInterceptor {
 mod tests {
     use super::*;
     use chrono::Utc;
+    use syswall_domain::entities::{
+        ConnectionId, ConnectionState, ConnectionVerdict, ProcessInfo, SystemUser,
+    };
+    use syswall_domain::value_objects::{Direction, Port, Protocol, SocketAddress};
 
     struct AlwaysAccept;
     #[async_trait]

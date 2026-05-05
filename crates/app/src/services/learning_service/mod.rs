@@ -1,3 +1,6 @@
+mod verdict_broadcast;
+pub use verdict_broadcast::VerdictBroadcasts;
+
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
