@@ -3,11 +3,17 @@
 
 import { writable } from 'svelte/store';
 
+export interface ToastAction {
+  label: string;
+  handler: () => void | Promise<void>;
+}
+
 export interface ToastMessage {
   id: string;
   message: string;
   variant: 'success' | 'error' | 'warning' | 'info';
   duration?: number;
+  action?: ToastAction;
 }
 
 const { subscribe, update } = writable<ToastMessage[]>([]);
@@ -22,12 +28,14 @@ export function addToast(
   message: string,
   variant: ToastMessage['variant'] = 'info',
   duration = 4000,
-) {
+  action?: ToastAction,
+): string {
   const id = crypto.randomUUID();
-  update((all) => [...all, { id, message, variant, duration }]);
+  update((all) => [...all, { id, message, variant, duration, action }]);
   if (duration > 0) {
     setTimeout(() => removeToast(id), duration);
   }
+  return id;
 }
 
 /**

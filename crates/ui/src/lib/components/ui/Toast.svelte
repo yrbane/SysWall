@@ -26,6 +26,17 @@
       role="alert"
     >
       <span class="toast-message">{toast.message}</span>
+      {#if toast.action}
+        <button
+          class="toast-action"
+          onclick={async () => {
+            await toast.action!.handler();
+            removeToast(toast.id);
+          }}
+        >
+          {toast.action.label}
+        </button>
+      {/if}
       <button
         class="toast-close"
         onclick={() => removeToast(toast.id)}
@@ -36,6 +47,14 @@
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </button>
+      {#if toast.duration && toast.duration > 0}
+        <div
+          class="toast-progress"
+          style:animation-duration="{toast.duration}ms"
+          style:background-color={variantColors[toast.variant] || variantColors.info}
+          aria-hidden="true"
+        ></div>
+      {/if}
     </div>
   {/each}
 </div>
@@ -54,6 +73,7 @@
 
   .toast {
     pointer-events: auto;
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -65,6 +85,7 @@
     min-width: 280px;
     max-width: 420px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
   }
 
   .toast-message {
@@ -72,6 +93,24 @@
     font-size: var(--font-size-sm);
     color: var(--text-primary);
     line-height: 1.4;
+  }
+
+  .toast-action {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid var(--border-primary);
+    color: var(--accent-cyan);
+    cursor: pointer;
+    padding: 2px 10px;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast), color var(--transition-fast);
+    white-space: nowrap;
+  }
+
+  .toast-action:hover {
+    background: var(--accent-cyan-15);
   }
 
   .toast-close {
@@ -90,5 +129,22 @@
 
   .toast-close:hover {
     color: var(--text-primary);
+  }
+
+  /* Barre de progression en bas du toast / Progress bar at toast bottom */
+  .toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: 100%;
+    opacity: 0.6;
+    transform-origin: left;
+    animation: toast-shrink linear forwards;
+  }
+
+  @keyframes toast-shrink {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
   }
 </style>
