@@ -2,6 +2,7 @@ mod bootstrap;
 mod config;
 mod grpc;
 mod signals;
+mod startup_error;
 mod supervisor;
 
 use std::path::Path;
@@ -17,40 +18,43 @@ use syswall_domain::ports::{EventBus, RuleRepository};
 
 use crate::config::SysWallConfig;
 use crate::grpc::{SysWallControlService, SysWallEventService, start_grpc_server};
+use crate::startup_error::StartupError;
 use crate::supervisor::Supervisor;
 
-#[tokio::main]
-async fn main() {
-    // Init tracing with env filter
+/// Initialise le filtre de tracing avant tout autre code.
+fn init_tracing() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "syswall=info".into()),
         )
         .init();
+}
 
+#[tokio::main]
+async fn main() {
+    init_tracing();
+
+    if let Err(e) = run().await {
+        error!("{e}");
+        std::process::exit(e.exit_code());
+    }
+}
+
+/// Point d'entrée principal du daemon — retourne une erreur typée en cas d'échec au démarrage.
+async fn run() -> Result<(), StartupError> {
     info!("SysWall daemon starting...");
 
-    // Load config from SYSWALL_CONFIG env var or default path
+    // Charge la config depuis SYSWALL_CONFIG ou le chemin par défaut
     let config_path = std::env::var("SYSWALL_CONFIG")
         .unwrap_or_else(|_| "config/default.toml".to_string());
 
-    let config = match SysWallConfig::load(Path::new(&config_path)) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Fatal: failed to load config: {}", e);
-            std::process::exit(1);
-        }
-    };
+    let config = SysWallConfig::load(Path::new(&config_path))
+        .map_err(|e| StartupError::ConfigInvalid(e.to_string()))?;
 
-    // Bootstrap application context
-    let ctx = match bootstrap::bootstrap(&config) {
-        Ok(ctx) => ctx,
-        Err(e) => {
-            eprintln!("Fatal: bootstrap failed: {}", e);
-            std::process::exit(1);
-        }
-    };
+    // Assemble le contexte applicatif (DB, repos, services, moniteurs)
+    let ctx = bootstrap::bootstrap(&config)
+        .map_err(|e| StartupError::InfrastructureInit(e.to_string()))?;
 
     // Create system whitelist if first start
     if let Err(e) = syswall_app::services::whitelist::ensure_system_whitelist(
@@ -294,4 +298,6 @@ async fn main() {
     let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Stopping]);
 
     info!("SysWall daemon stopped");
+
+    Ok(())
 }
