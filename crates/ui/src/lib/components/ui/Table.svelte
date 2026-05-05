@@ -40,10 +40,14 @@
   const visibleRows = $derived(rows.slice(startIndex, endIndex));
   const offsetY = $derived(startIndex * rowHeight);
 
+  // Suivi du scroll pour l'ombre sticky header / Scroll tracking for sticky header shadow
+  let scrolled = $state(false);
+
   function handleScroll(e: Event) {
     const target = e.target as HTMLDivElement;
     scrollTop = target.scrollTop;
     containerHeight = target.clientHeight;
+    scrolled = target.scrollTop > 0;
   }
 
   function getCellValue(row: T, key: string): string {
@@ -55,7 +59,7 @@
 
 <div class="table-wrapper" style="max-height: {maxHeight};">
   <div class="table-header">
-    <div class="table-row header-row">
+    <div class="table-row header-row" class:scrolled>
       {#each columns as col}
         <div class="table-cell header-cell" style={col.width ? `width: ${col.width}` : ''}>
           {col.label}
@@ -147,8 +151,22 @@
     transition: background var(--transition-fast);
   }
 
+  /* Zebra-striping subtil / Subtle zebra-striping */
+  .body-row:nth-child(even) {
+    background: var(--bg-row-stripe);
+  }
+
   .body-row:hover {
-    background: var(--bg-hover);
+    background: var(--bg-row-hover);
+  }
+
+  /* Ombre sticky header au scroll / Sticky header shadow on scroll */
+  .header-row {
+    transition: box-shadow 150ms ease;
+  }
+
+  .header-row.scrolled {
+    box-shadow: var(--shadow-sticky-header);
   }
 
   .table-cell {
