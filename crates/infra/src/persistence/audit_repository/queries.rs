@@ -5,7 +5,6 @@ use std::collections::HashMap;
 
 use syswall_domain::entities::{AuditEvent, AuditStats, EventCategory, EventId, Severity};
 use syswall_domain::errors::DomainError;
-use syswall_domain::events::Pagination;
 use syswall_domain::ports::AuditFilters;
 
 use super::SqliteAuditRepository;
