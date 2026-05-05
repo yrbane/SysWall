@@ -46,3 +46,10 @@ enabled = true
 locale = "fr"
 theme = "dark"
 refresh_interval_ms = 1000
+
+[antilockout]
+enabled = true
+endpoints = ["1.1.1.1:53", "[2606:4700:4700::1111]:53"]
+timeout_secs = 30
+probe_interval_secs = 5
+per_endpoint_timeout_secs = 2

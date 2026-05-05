@@ -17,6 +17,8 @@ pub struct SysWallConfig {
     pub ui: UiConfig,
     #[serde(default)]
     pub ebpf: EbpfConfig,
+    #[serde(default)]
+    pub antilockout: Option<AntilockoutConfig>,
 }
 
 /// Daemon runtime configuration (socket, logging, watchdog).
@@ -158,6 +160,42 @@ pub struct UiConfig {
     pub refresh_interval_ms: u64,
 }
 
+/// Anti-lockout watchdog configuration.
+/// Configuration de la sentinelle anti-lockout.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AntilockoutConfig {
+    #[serde(default = "default_antilockout_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_antilockout_endpoints")]
+    pub endpoints: Vec<String>,
+    #[serde(default = "default_antilockout_timeout")]
+    pub timeout_secs: u64,
+    #[serde(default = "default_antilockout_probe_interval")]
+    pub probe_interval_secs: u64,
+    #[serde(default = "default_antilockout_per_endpoint_timeout")]
+    pub per_endpoint_timeout_secs: u64,
+}
+
+fn default_antilockout_enabled() -> bool { true }
+fn default_antilockout_endpoints() -> Vec<String> {
+    vec!["1.1.1.1:53".into(), "[2606:4700:4700::1111]:53".into()]
+}
+fn default_antilockout_timeout() -> u64 { 30 }
+fn default_antilockout_probe_interval() -> u64 { 5 }
+fn default_antilockout_per_endpoint_timeout() -> u64 { 2 }
+
+impl Default for AntilockoutConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_antilockout_enabled(),
+            endpoints: default_antilockout_endpoints(),
+            timeout_secs: default_antilockout_timeout(),
+            probe_interval_secs: default_antilockout_probe_interval(),
+            per_endpoint_timeout_secs: default_antilockout_per_endpoint_timeout(),
+        }
+    }
+}
+
 /// Configuration eBPF (activation, taille du ring buffer).
 /// eBPF configuration (activation, ring buffer size).
 #[derive(Debug, Deserialize)]
@@ -271,5 +309,44 @@ enabled = true
     fn default_policy_conversion() {
         let policy: DefaultPolicy = (&DefaultPolicyConfig::Ask).into();
         assert_eq!(policy, DefaultPolicy::Ask);
+    }
+
+    const ANTILOCKOUT_CONFIG: &str = r#"
+[antilockout]
+enabled = true
+endpoints = ["1.1.1.1:53", "[2606:4700:4700::1111]:53"]
+timeout_secs = 30
+probe_interval_secs = 5
+per_endpoint_timeout_secs = 2
+"#;
+
+    #[test]
+    fn parse_antilockout_section() {
+        let full = format!("{}\n{}", TEST_CONFIG, ANTILOCKOUT_CONFIG);
+        let config = SysWallConfig::from_toml(&full).unwrap();
+        let al = config.antilockout.as_ref().unwrap();
+        assert!(al.enabled);
+        assert_eq!(al.endpoints.len(), 2);
+        assert_eq!(al.timeout_secs, 30);
+        assert_eq!(al.probe_interval_secs, 5);
+        assert_eq!(al.per_endpoint_timeout_secs, 2);
+    }
+
+    #[test]
+    fn antilockout_section_is_optional() {
+        let config = SysWallConfig::from_toml(TEST_CONFIG).unwrap();
+        // None means "use defaults at bootstrap time"
+        assert!(config.antilockout.is_none());
+    }
+
+    #[test]
+    fn antilockout_default_values() {
+        let cfg = AntilockoutConfig::default();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.timeout_secs, 30);
+        assert_eq!(cfg.probe_interval_secs, 5);
+        assert_eq!(cfg.per_endpoint_timeout_secs, 2);
+        assert_eq!(cfg.endpoints.len(), 2);
+        assert_eq!(cfg.endpoints[0], "1.1.1.1:53");
     }
 }
