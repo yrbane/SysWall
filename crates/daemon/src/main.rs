@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), deny(clippy::unwrap_used))]
+
 mod bootstrap;
 mod config;
 mod grpc;
