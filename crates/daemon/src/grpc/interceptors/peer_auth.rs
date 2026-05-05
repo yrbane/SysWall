@@ -64,7 +64,9 @@ impl Interceptor for PeerAuthInterceptor {
             .with_metadata("uid", creds.uid.to_string())
             .with_metadata("gid", creds.gid.to_string())
             .with_metadata("pid", creds.pid.to_string());
-            let _ = self.audit_tx.try_send(event);
+            if let Err(tokio::sync::mpsc::error::TrySendError::Full(_)) = self.audit_tx.try_send(event) {
+                tracing::warn!(target: "auth", "audit channel full, denial event dropped");
+            }
             Err(Status::permission_denied(
                 "syswall: caller must be root or in group 'syswall'",
             ))
