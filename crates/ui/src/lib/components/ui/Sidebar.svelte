@@ -234,7 +234,10 @@
       flex-direction: column;
       align-items: center;
       gap: 2px;
-      padding: 6px 2px;
+      padding: 12px 8px;
+      min-width: 44px;
+      min-height: 44px;
+      box-sizing: border-box;
       font-size: 9px;
       border-radius: 0;
     }
