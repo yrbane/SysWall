@@ -1,15 +1,21 @@
-use std::net::IpAddr;
+//! Traduction des règles du domaine en expressions nftables.
+//! Translation of domain rules into nftables expressions.
 
-use syswall_domain::entities::{IpMatcher, PortMatcher, Rule, RuleEffect};
-use syswall_domain::value_objects::{Direction, Protocol};
+mod criteria;
+mod verdict;
+
+use syswall_domain::entities::{Rule, RuleEffect};
+use syswall_domain::value_objects::Direction;
 
 use super::types::TranslatedRule;
+use criteria::{build_ip_expressions, build_port_expressions, resolve_username_to_uid};
+use verdict::build_verdict;
 
-/// Translate a domain Rule into nft expression arguments.
-/// Returns None if the rule should not produce an nft rule (Ask effect).
-///
 /// Traduit une Rule du domaine en arguments d'expressions nft.
 /// Retourne None si la regle ne doit pas produire de regle nft (effet Ask).
+///
+/// Translate a domain Rule into nft expression arguments.
+/// Returns None if the rule should not produce an nft rule (Ask effect).
 pub fn translate_rule(rule: &Rule) -> Option<TranslatedRule> {
     if rule.effect == RuleEffect::Ask {
         return None;
@@ -21,6 +27,7 @@ pub fn translate_rule(rule: &Rule) -> Option<TranslatedRule> {
 
     // Protocol match
     if let Some(ref proto) = criteria.protocol {
+        use syswall_domain::value_objects::Protocol;
         let proto_str = match proto {
             Protocol::Tcp => "tcp",
             Protocol::Udp => "udp",
@@ -91,120 +98,13 @@ pub fn translate_rule(rule: &Rule) -> Option<TranslatedRule> {
     })
 }
 
+/// Détermine dans quelles chaînes nftables une règle doit être placée.
 /// Determine which nftables chains a rule should be placed in.
-/// Determine dans quelles chaines nftables une regle doit etre placee.
 pub fn get_target_chains(rule: &Rule) -> Vec<String> {
     match rule.criteria.direction {
         Some(Direction::Inbound) => vec!["input".to_string()],
         Some(Direction::Outbound) => vec!["output".to_string()],
         None => vec!["input".to_string(), "output".to_string()],
-    }
-}
-
-/// Resolve a username to a numeric UID.
-/// Returns None if the user cannot be found.
-///
-/// Resout un nom d'utilisateur en UID numerique.
-/// Retourne None si l'utilisateur est introuvable.
-pub fn resolve_username_to_uid(username: &str) -> Option<u32> {
-    nix::unistd::User::from_name(username)
-        .ok()
-        .flatten()
-        .map(|u| u.uid.as_raw())
-}
-
-/// Build nft expressions for IP matching based on direction.
-/// For outbound: remote IP is destination (daddr).
-/// For inbound: remote IP is source (saddr).
-///
-/// Construit les expressions nft pour la correspondance IP selon la direction.
-fn build_ip_expressions(ip_matcher: &IpMatcher, is_outbound: bool) -> Vec<String> {
-    let direction_keyword = if is_outbound { "daddr" } else { "saddr" };
-
-    match ip_matcher {
-        IpMatcher::Exact(ip) => {
-            let family = match ip {
-                IpAddr::V4(_) => "ip",
-                IpAddr::V6(_) => "ip6",
-            };
-            vec![
-                family.to_string(),
-                direction_keyword.to_string(),
-                ip.to_string(),
-            ]
-        }
-        IpMatcher::Cidr {
-            network,
-            prefix_len,
-        } => {
-            let family = match network {
-                IpAddr::V4(_) => "ip",
-                IpAddr::V6(_) => "ip6",
-            };
-            vec![
-                family.to_string(),
-                direction_keyword.to_string(),
-                format!("{}/{}", network, prefix_len),
-            ]
-        }
-        IpMatcher::Range { start, end } => {
-            let family = match start {
-                IpAddr::V4(_) => "ip",
-                IpAddr::V6(_) => "ip6",
-            };
-            vec![
-                family.to_string(),
-                direction_keyword.to_string(),
-                format!("{}-{}", start, end),
-            ]
-        }
-    }
-}
-
-/// Build nft expressions for port matching.
-/// Construit les expressions nft pour la correspondance de port.
-fn build_port_expressions(
-    port_matcher: &PortMatcher,
-    protocol: Option<Protocol>,
-    keyword: &str,
-) -> Vec<String> {
-    let proto_str = match protocol {
-        Some(Protocol::Tcp) => "tcp",
-        Some(Protocol::Udp) => "udp",
-        _ => "tcp", // default to tcp if protocol not specified with port
-    };
-
-    match port_matcher {
-        PortMatcher::Exact(port) => {
-            vec![
-                proto_str.to_string(),
-                keyword.to_string(),
-                port.value().to_string(),
-            ]
-        }
-        PortMatcher::Range { start, end } => {
-            vec![
-                proto_str.to_string(),
-                keyword.to_string(),
-                format!("{}-{}", start.value(), end.value()),
-            ]
-        }
-    }
-}
-
-/// Build the verdict expression (accept, drop, or log+accept for observe).
-/// Construit l'expression de verdict (accept, drop, ou log+accept pour observe).
-fn build_verdict(effect: RuleEffect) -> Vec<String> {
-    match effect {
-        RuleEffect::Allow => vec!["accept".to_string()],
-        RuleEffect::Block => vec!["drop".to_string()],
-        RuleEffect::Observe => vec![
-            "log".to_string(),
-            "prefix".to_string(),
-            "\"syswall-observe: \"".to_string(),
-            "accept".to_string(),
-        ],
-        RuleEffect::Ask => vec![], // should never reach here
     }
 }
 
@@ -496,19 +396,19 @@ mod tests {
 
     #[test]
     fn block_verdict_produces_drop() {
-        let result = build_verdict(RuleEffect::Block);
+        let result = verdict::build_verdict(RuleEffect::Block);
         assert_eq!(result, vec!["drop"]);
     }
 
     #[test]
     fn allow_verdict_produces_accept() {
-        let result = build_verdict(RuleEffect::Allow);
+        let result = verdict::build_verdict(RuleEffect::Allow);
         assert_eq!(result, vec!["accept"]);
     }
 
     #[test]
     fn observe_verdict_produces_log_and_accept() {
-        let result = build_verdict(RuleEffect::Observe);
+        let result = verdict::build_verdict(RuleEffect::Observe);
         assert_eq!(result.len(), 4);
         assert_eq!(result[0], "log");
         assert_eq!(result[1], "prefix");
