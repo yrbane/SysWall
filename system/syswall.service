@@ -1,55 +1,49 @@
 [Unit]
-Description=SysWall Firewall Daemon
-After=network.target
+Description=SysWall application-level firewall daemon
+After=network-pre.target
+Wants=network-pre.target
+Documentation=https://github.com/yrbane/SysWall
 
 [Service]
 Type=notify
 ExecStart=/usr/bin/syswall-daemon
-Environment=SYSWALL_CONFIG=/etc/syswall/config.toml
-User=root
 Restart=on-failure
-RestartSec=5s
-WatchdogSec=30s
+RestartSec=5
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
-# --- Capacités minimales / Minimal capabilities ---
-# CAP_NET_ADMIN : gestion nftables / nftables management
-# CAP_NET_RAW   : conntrack, sockets bruts / raw sockets
-# CAP_SYS_PTRACE : lecture /proc/<pid>/ d'autres processus / read other process /proc
-# CAP_DAC_READ_SEARCH : lecture /proc/net sans restriction / unrestricted /proc/net access
-# CAP_BPF       : chargement programmes eBPF / eBPF program loading
-# CAP_PERFMON   : attachement tracepoints eBPF / eBPF tracepoint attachment
-# CAP_CHOWN     : chown du socket Unix vers le groupe syswall / chown socket to syswall group
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_BPF CAP_PERFMON CAP_CHOWN
-AmbientCapabilities=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_BPF CAP_PERFMON
+# Identite / Identity
+User=syswall
+Group=syswall
 
-# --- Durcissement du système de fichiers / Filesystem hardening ---
-ProtectHome=read-only
+# Capabilities (eBPF + nftables + procfs + chown socket)
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_BPF CAP_PERFMON CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_CHOWN
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_BPF CAP_PERFMON CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_CHOWN
+
+# Sandbox
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=true
 PrivateTmp=true
-ProtectControlGroups=true
 ProtectKernelModules=true
-ProtectKernelLogs=true
-
-# --- Restriction réseau / Network restrictions ---
-# Seules les familles d'adresses nécessaires / Only needed address families
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
-
-# --- Restriction des appels système / System call restrictions ---
-# Liste noire : bloquer les catégories dangereuses sans casser le runtime
-# Blacklist: block dangerous categories without breaking the runtime
-SystemCallFilter=~@clock @cpu-emulation @debug @module @mount @obsolete @raw-io @reboot @swap
-SystemCallArchitectures=native
-
-# --- Divers / Miscellaneous ---
-# NoNewPrivileges=false requis pour eBPF JIT / required for eBPF JIT
-NoNewPrivileges=false
+ProtectControlGroups=true
+RestrictNamespaces=true
 LockPersonality=true
 RestrictRealtime=true
-RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
+SystemCallFilter=@system-service @network-io @file-system ~@privileged ~@resources ~@obsolete
+SystemCallArchitectures=native
 
-# --- Répertoires d'exécution / Runtime directories ---
+# MDWX desactive : le JIT eBPF (BPF_PROG_LOAD) requiert des pages WX kernel-side.
+# MDWX disabled: eBPF JIT requires WX pages kernel-side.
+MemoryDenyWriteExecute=false
+
+# Repertoires geres par systemd (mode 0750, owned syswall:syswall)
+# Directories managed by systemd (mode 0750, owned syswall:syswall)
+ConfigurationDirectory=syswall
+LogsDirectory=syswall
+StateDirectory=syswall
 RuntimeDirectory=syswall
-RuntimeDirectoryMode=0755
-ReadWritePaths=/var/lib/syswall /var/log/syswall /var/run/syswall
 
 [Install]
 WantedBy=multi-user.target
