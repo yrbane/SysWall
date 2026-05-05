@@ -178,7 +178,9 @@
             class="toggle-switch"
             class:active={rule.enabled}
             onclick={() => handleToggle(rule)}
-            aria-label={rule.enabled ? fr.rules_enabled : fr.rules_disabled}
+            role="switch"
+            aria-checked={rule.enabled}
+            aria-label={rule.enabled ? `Désactiver ${rule.name}` : `Activer ${rule.name}`}
           >
             <span class="toggle-thumb"></span>
           </button>
