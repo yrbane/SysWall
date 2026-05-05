@@ -6,6 +6,7 @@ mod grpc;
 mod signals;
 mod startup_error;
 mod supervisor;
+mod watchdog;
 
 use std::path::Path;
 use std::time::Duration;
@@ -312,23 +313,9 @@ async fn run() -> Result<(), StartupError> {
         }
     });
 
-    // Systemd watchdog heartbeat
-    supervisor.spawn("systemd-watchdog", {
-        let cancel = cancel.clone();
-        async move {
-            // WatchdogSec=30s in the unit file, ping every 15s (half the interval)
-            let interval = Duration::from_secs(15);
-            loop {
-                tokio::select! {
-                    _ = cancel.cancelled() => break,
-                    _ = tokio::time::sleep(interval) => {
-                        let _ = sd_notify::notify(false, &[sd_notify::NotifyState::Watchdog]);
-                    }
-                }
-            }
-            Ok(())
-        }
-    });
+    // Watchdog systemd — envoie WATCHDOG=1 toutes les watchdog_interval_secs/2 secondes
+    // Systemd watchdog — sends WATCHDOG=1 every watchdog_interval_secs/2 seconds
+    watchdog::spawn_watchdog(config.daemon.watchdog_interval_secs, cancel.clone());
 
     // Lance l'intercepteur NFQUEUE (mode dégradé si CAP_NET_ADMIN absent)
     // Launch the NFQUEUE interceptor (degraded mode if CAP_NET_ADMIN is missing)
