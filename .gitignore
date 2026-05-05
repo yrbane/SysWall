@@ -4,3 +4,8 @@ crates/ebpf-prog/target/
 crates/ui/node_modules/
 crates/ui/.svelte-kit/
 crates/ui/build/
+
+# Build artifacts ARCH packaging (Cargo target ignored elsewhere)
+system/arch/pkg/
+system/arch/*.pkg.tar.zst
+crates/ebpf-prog/Cargo.lock
