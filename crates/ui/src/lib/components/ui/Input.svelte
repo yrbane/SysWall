@@ -4,13 +4,15 @@
     placeholder?: string;
     value?: string;
     label?: string;
+    error?: string;
+    disabled?: boolean;
     oninput?: (e: Event) => void;
   }
 
-  let { type = 'text', placeholder = '', value = $bindable(''), label, oninput }: Props = $props();
+  let { type = 'text', placeholder = '', value = $bindable(''), label, error, disabled = false, oninput }: Props = $props();
 </script>
 
-<div class="input-group">
+<div class="input-group" class:has-error={!!error} class:is-disabled={disabled}>
   {#if label}
     <label class="input-label">{label}</label>
   {/if}
@@ -18,9 +20,15 @@
     class="input"
     {type}
     {placeholder}
+    {disabled}
+    aria-invalid={!!error}
+    aria-describedby={error ? 'input-error' : undefined}
     bind:value
     {oninput}
   />
+  {#if error}
+    <span id="input-error" class="error-message" role="alert">{error}</span>
+  {/if}
 </div>
 
 <style>
@@ -62,5 +70,23 @@
 
   .input[type='search'] {
     font-family: var(--font-mono);
+  }
+
+  /* Etat erreur / Error state */
+  .input-group.has-error .input {
+    border-color: var(--accent-red);
+  }
+
+  .error-message {
+    color: var(--accent-red);
+    font-size: var(--font-size-sm);
+    margin-top: 4px;
+    display: block;
+  }
+
+  /* Etat désactivé / Disabled state */
+  .input-group.is-disabled .input {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>
