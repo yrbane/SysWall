@@ -3,14 +3,14 @@ Description=SysWall application-level firewall daemon
 After=network-pre.target
 Wants=network-pre.target
 Documentation=https://github.com/yrbane/SysWall
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 [Service]
 Type=notify
 ExecStart=/usr/bin/syswall-daemon
 Restart=on-failure
 RestartSec=5
-StartLimitIntervalSec=120
-StartLimitBurst=5
 
 # Identite / Identity
 User=syswall
