@@ -22,6 +22,8 @@ pub struct SysWallConfig {
     pub ebpf: EbpfConfig,
     #[serde(default)]
     pub antilockout: Option<AntilockoutConfig>,
+    #[serde(default)]
+    pub nfqueue: Option<NfqueueConfig>,
 }
 
 /// Daemon runtime configuration (socket, logging, watchdog).
@@ -231,6 +233,36 @@ impl Default for EbpfConfig {
     }
 }
 
+/// NFQUEUE-based active blocking configuration.
+/// Configuration du blocage actif via NFQUEUE.
+#[derive(Debug, Clone, Deserialize)]
+pub struct NfqueueConfig {
+    #[serde(default = "default_nfq_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_nfq_queue_num")]
+    pub queue_num: u16,
+    #[serde(default = "default_nfq_max_queued")]
+    pub max_queued: u32,
+    #[serde(default = "default_nfq_overflow_policy")]
+    pub overflow_policy: String, // "block" or "accept"
+}
+
+fn default_nfq_enabled() -> bool { true }
+fn default_nfq_queue_num() -> u16 { 0 }
+fn default_nfq_max_queued() -> u32 { 1024 }
+fn default_nfq_overflow_policy() -> String { "block".to_string() }
+
+impl Default for NfqueueConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_nfq_enabled(),
+            queue_num: default_nfq_queue_num(),
+            max_queued: default_nfq_max_queued(),
+            overflow_policy: default_nfq_overflow_policy(),
+        }
+    }
+}
+
 impl SysWallConfig {
     /// Load config from a TOML file. Falls back to defaults if the file doesn't exist.
     /// Charge la configuration depuis un fichier TOML. Retourne une erreur si le fichier est invalide.
@@ -361,5 +393,39 @@ per_endpoint_timeout_secs = 2
         assert_eq!(cfg.per_endpoint_timeout_secs, 2);
         assert_eq!(cfg.endpoints.len(), 2);
         assert_eq!(cfg.endpoints[0], "1.1.1.1:53");
+    }
+
+    const NFQ_TOML: &str = r#"
+[nfqueue]
+enabled = true
+queue_num = 7
+max_queued = 2048
+overflow_policy = "accept"
+"#;
+
+    #[test]
+    fn parse_nfqueue_section() {
+        let full = format!("{}\n{}", TEST_CONFIG, NFQ_TOML);
+        let cfg = SysWallConfig::from_toml(&full).unwrap();
+        let nq = cfg.nfqueue.as_ref().unwrap();
+        assert!(nq.enabled);
+        assert_eq!(nq.queue_num, 7);
+        assert_eq!(nq.max_queued, 2048);
+        assert_eq!(nq.overflow_policy, "accept");
+    }
+
+    #[test]
+    fn nfqueue_section_is_optional() {
+        let cfg = SysWallConfig::from_toml(TEST_CONFIG).unwrap();
+        assert!(cfg.nfqueue.is_none());
+    }
+
+    #[test]
+    fn nfqueue_default_values() {
+        let cfg = NfqueueConfig::default();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.queue_num, 0);
+        assert_eq!(cfg.max_queued, 1024);
+        assert_eq!(cfg.overflow_policy, "block");
     }
 }
