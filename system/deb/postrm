@@ -1,7 +1,13 @@
-#!/bin/bash
+#!/bin/sh
 set -e
-if [ "$1" = "purge" ]; then
-    rm -rf /var/lib/syswall /var/log/syswall
-    groupdel syswall 2>/dev/null || true
-fi
-systemctl daemon-reload
+case "$1" in
+    remove)
+        /bin/sh /usr/share/syswall/prerm.sh || true
+        ;;
+    purge)
+        rm -rf /var/lib/syswall /var/log/syswall
+        groupdel syswall 2>/dev/null || true
+        ;;
+esac
+systemctl daemon-reload 2>/dev/null || true
+exit 0

@@ -33,4 +33,7 @@ package() {
     install -Dm644 system/syswall.desktop "$pkgdir/usr/share/applications/syswall.desktop"
     install -Dm644 config/default.toml "$pkgdir/etc/syswall/config.toml"
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    # Scripts post-install partages / Shared post-install scripts
+    install -Dm755 system/install/postinst.sh "$pkgdir/usr/share/syswall/postinst.sh"
+    install -Dm755 system/install/prerm.sh "$pkgdir/usr/share/syswall/prerm.sh"
 }

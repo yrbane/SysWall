@@ -1,9 +1,8 @@
-#!/bin/bash
+#!/bin/sh
 set -e
-if ! getent group syswall > /dev/null 2>&1; then
-    groupadd syswall
-fi
-mkdir -p /var/lib/syswall /var/log/syswall /var/run/syswall
-setcap 'cap_net_admin,cap_net_raw,cap_sys_ptrace,cap_dac_read_search,cap_bpf,cap_perfmon=ep' /usr/bin/syswall-daemon 2>/dev/null || true
-systemctl daemon-reload
-echo "SysWall installed. Start with: sudo systemctl start syswall"
+case "$1" in
+    configure)
+        /bin/sh /usr/share/syswall/postinst.sh
+        ;;
+esac
+exit 0

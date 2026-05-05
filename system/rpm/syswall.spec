@@ -15,21 +15,19 @@ une surveillance des connexions en temps réel, un auto-apprentissage
 intelligent et une gestion granulaire des règles via nftables.
 
 %post
-getent group syswall > /dev/null 2>&1 || groupadd syswall
-mkdir -p /var/lib/syswall /var/log/syswall /var/run/syswall
-setcap 'cap_net_admin,cap_net_raw,cap_sys_ptrace,cap_dac_read_search,cap_bpf,cap_perfmon=ep' /usr/bin/syswall-daemon 2>/dev/null || true
-systemctl daemon-reload
+/bin/sh /usr/share/syswall/postinst.sh
 
 %preun
-systemctl stop syswall 2>/dev/null || true
-systemctl disable syswall 2>/dev/null || true
+/bin/sh /usr/share/syswall/prerm.sh
 
 %postun
-systemctl daemon-reload
+systemctl daemon-reload 2>/dev/null || true
 
 %files
 /usr/bin/syswall-daemon
 /usr/bin/syswall-ui
 /usr/lib/systemd/system/syswall.service
 /usr/share/applications/syswall.desktop
+/usr/share/syswall/postinst.sh
+/usr/share/syswall/prerm.sh
 %config(noreplace) /etc/syswall/config.toml
