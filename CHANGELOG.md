@@ -3,7 +3,7 @@
 Toutes les modifications notables seront documentees ici.
 All notable changes documented here.
 
-## [0.2.0] - 2026-05-XX
+## [0.2.0] - 2026-05-05
 
 ### Added / Ajoute
 
