@@ -4,24 +4,17 @@
   interface Props {
     title?: string;
     padding?: 'sm' | 'md' | 'lg';
-    glow?: 'cyan' | 'green' | 'red' | 'none';
     children: Snippet;
   }
 
-  let { title, padding = 'md', glow = 'none', children }: Props = $props();
+  let { title, padding = 'md', children }: Props = $props();
 
   const paddingMap = { sm: 'var(--space-3)', md: 'var(--space-4)', lg: 'var(--space-6)' };
-  const glowMap: Record<string, string> = {
-    cyan: 'var(--glow-cyan)',
-    green: 'var(--glow-green)',
-    red: 'var(--glow-red)',
-    none: 'none',
-  };
 </script>
 
 <div
   class="card"
-  style="padding: {paddingMap[padding]}; box-shadow: {glowMap[glow]};"
+  style="padding: {paddingMap[padding]};"
 >
   {#if title}
     <h3 class="card-title">{title}</h3>
