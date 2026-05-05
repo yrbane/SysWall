@@ -243,6 +243,24 @@ cargo audit
 
 ## Securite / Security
 
+### Securite renforcee (V0.2) / Hardened security (V0.2)
+
+- **Anti-lockout 30s** : tout changement de regles declenche une fenetre de surveillance de 30s. Si la connectivite externe est perdue (TCP probe vers les endpoints configures, par defaut Cloudflare DNS), le ruleset est automatiquement annule et un evenement `Critical, EventCategory::Antilockout` est journalise.
+- **Authentification gRPC** : le socket Unix `/run/syswall/syswall.sock` n'accepte que les peers `root` ou membres du groupe systeme `syswall` (verification via `SO_PEERCRED`). Les refus sont audites.
+- **Daemon non-root** : `syswall-daemon` tourne en utilisateur dedie `syswall` avec uniquement les capabilities ambient strictement necessaires (CAP_NET_ADMIN, CAP_BPF, CAP_PERFMON, CAP_SYS_PTRACE, CAP_DAC_READ_SEARCH, CAP_CHOWN). Sandbox systemd : `ProtectSystem=strict`, `RestrictAddressFamilies`, `SystemCallFilter`, `LockPersonality`.
+- **CSP UI stricte** : la fenetre Tauri applique une Content Security Policy stricte, sans `unsafe-eval`.
+- **Limites gRPC** : 1 MiB max par message decode, 4 MiB max encode, 64 streams concurrents max par connexion, timeout 30 s.
+
+EN:
+
+- **Anti-lockout 30 s**: every ruleset change triggers a 30-second supervision window. If outbound connectivity is lost (TCP probe against configured endpoints, default Cloudflare DNS), the ruleset is rolled back automatically and a `Critical, EventCategory::Antilockout` event is journaled.
+- **gRPC authentication**: the Unix socket `/run/syswall/syswall.sock` only accepts peers that are `root` or members of the `syswall` system group (`SO_PEERCRED` check). Denials are audited.
+- **Non-root daemon**: `syswall-daemon` runs as a dedicated `syswall` user with only the strictly required ambient capabilities. Systemd sandbox enabled.
+- **Strict UI CSP**: the Tauri window enforces a strict Content Security Policy with no `unsafe-eval`.
+- **gRPC limits**: 1 MiB max decoded message size, 4 MiB max encode, 64 concurrent streams per connection, 30 s timeout.
+
+---
+
 Le service systemd est durci avec des restrictions strictes :
 
 The systemd service is hardened with strict restrictions:
