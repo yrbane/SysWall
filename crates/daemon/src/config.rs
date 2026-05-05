@@ -28,14 +28,10 @@ pub struct SysWallConfig {
 
 /// Daemon runtime configuration (socket, logging, watchdog).
 /// Configuration d'exécution du démon (socket, journalisation, chien de garde).
-// log_level, log_dir, watchdog_interval_secs : présents dans le fichier de configuration
-// mais pas encore consommés dans le code courant (réservés pour l'initialisation du journal).
-#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct DaemonConfig {
     pub socket_path: PathBuf,
     pub log_level: String,
-    pub log_dir: PathBuf,
     pub watchdog_interval_secs: u64,
 }
 
@@ -151,9 +147,6 @@ fn default_conntrack_protocols() -> Vec<String> {
 
 /// Learning mode configuration (debounce, timeouts, overflow).
 /// Configuration du mode d'apprentissage (anti-rebond, délais, débordement).
-// enabled, debounce_window_secs, default_timeout_action, overflow_action : lus depuis TOML,
-// transmis au LearningService via AppLearningConfig ; les champs non encore relus ici sont intentionnels.
-#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct LearningConfig {
     pub enabled: bool,
@@ -164,15 +157,11 @@ pub struct LearningConfig {
     pub overflow_action: String,
 }
 
-/// UI configuration (locale, theme, refresh rate).
-/// Configuration de l'interface utilisateur (locale, thème, fréquence de rafraîchissement).
-// locale, theme, refresh_interval_ms : présents dans le TOML, transmis à l'UI via gRPC dans le futur.
-#[allow(dead_code)]
+/// UI configuration (locale only — theme and refresh are managed externally).
+/// Configuration de l'interface utilisateur (locale uniquement).
 #[derive(Debug, Deserialize)]
 pub struct UiConfig {
     pub locale: String,
-    pub theme: String,
-    pub refresh_interval_ms: u64,
 }
 
 /// Anti-lockout watchdog configuration.
@@ -290,7 +279,6 @@ config_version = 1
 [daemon]
 socket_path = "/var/run/syswall/syswall.sock"
 log_level = "info"
-log_dir = "/var/log/syswall"
 watchdog_interval_secs = 15
 
 [database]
@@ -327,8 +315,6 @@ overflow_action = "block"
 
 [ui]
 locale = "fr"
-theme = "dark"
-refresh_interval_ms = 1000
 
 [ebpf]
 enabled = true

@@ -3,7 +3,6 @@ config_version = 1
 [daemon]
 socket_path = "/var/run/syswall/syswall.sock"
 log_level = "info"
-log_dir = "/var/log/syswall"
 watchdog_interval_secs = 15
 
 [database]
@@ -44,8 +43,6 @@ enabled = true
 
 [ui]
 locale = "fr"
-theme = "dark"
-refresh_interval_ms = 1000
 
 [antilockout]
 enabled = true
