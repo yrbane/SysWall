@@ -31,6 +31,9 @@ pub struct SysWallConfig {
 #[derive(Debug, Deserialize)]
 pub struct DaemonConfig {
     pub socket_path: PathBuf,
+    /// Niveau de log applique par tracing-subscriber via RUST_LOG ou la valeur par defaut.
+    /// Log level applied by tracing-subscriber via RUST_LOG or the default value.
+    #[allow(dead_code)]
     pub log_level: String,
     pub watchdog_interval_secs: u64,
 }
@@ -150,6 +153,9 @@ fn default_conntrack_protocols() -> Vec<String> {
 #[derive(Debug, Deserialize)]
 pub struct LearningConfig {
     pub enabled: bool,
+    /// Anti-rebond cote UI — non utilise par le daemon (traite par le frontend).
+    /// UI-side debounce — not used by the daemon (handled by the frontend).
+    #[allow(dead_code)]
     pub debounce_window_secs: u64,
     pub prompt_timeout_secs: u64,
     pub default_timeout_action: String,
@@ -161,6 +167,9 @@ pub struct LearningConfig {
 /// Configuration de l'interface utilisateur (locale uniquement).
 #[derive(Debug, Deserialize)]
 pub struct UiConfig {
+    /// Locale de l'interface — reservee a une future internationalisation.
+    /// UI locale — reserved for future internationalization.
+    #[allow(dead_code)]
     pub locale: String,
 }
 
