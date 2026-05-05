@@ -35,30 +35,30 @@ impl FakeAuditRepository {
     /// Apply filters to a list of events (for realistic fake queries).
     /// Applique les filtres à une liste d'événements (pour des requêtes factices réalistes).
     fn matches(event: &AuditEvent, filters: &AuditFilters) -> bool {
-        if let Some(ref severity) = filters.severity {
-            if event.severity != *severity {
-                return false;
-            }
+        if let Some(ref severity) = filters.severity
+            && event.severity != *severity
+        {
+            return false;
         }
-        if let Some(ref category) = filters.category {
-            if event.category != *category {
-                return false;
-            }
+        if let Some(ref category) = filters.category
+            && event.category != *category
+        {
+            return false;
         }
-        if let Some(ref search) = filters.search {
-            if !event.description.contains(search.as_str()) {
-                return false;
-            }
+        if let Some(ref search) = filters.search
+            && !event.description.contains(search.as_str())
+        {
+            return false;
         }
-        if let Some(ref from) = filters.from {
-            if event.timestamp < *from {
-                return false;
-            }
+        if let Some(ref from) = filters.from
+            && event.timestamp < *from
+        {
+            return false;
         }
-        if let Some(ref to) = filters.to {
-            if event.timestamp > *to {
-                return false;
-            }
+        if let Some(ref to) = filters.to
+            && event.timestamp > *to
+        {
+            return false;
         }
         true
     }
