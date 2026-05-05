@@ -18,7 +18,7 @@ mod tests {
     use crate::commands::CreateRuleCommand;
     use crate::fakes::*;
     use crate::services::connection_service::ConnectionService;
-    use crate::services::learning_service::{LearningConfig, LearningService};
+    use crate::services::learning_service::{LearningConfig, LearningService, VerdictBroadcasts};
     use crate::services::rule_service::RuleService;
     use crate::services::whitelist::ensure_system_whitelist;
 
@@ -225,6 +225,10 @@ mod tests {
             decision_repo,
             notifier,
             event_bus,
+            Arc::new(FakeAuditRepository::new()),
+            Arc::new(FakeRuleRepository::new()),
+            DefaultPolicy::Block,
+            Arc::new(VerdictBroadcasts::new()),
             LearningConfig {
                 prompt_timeout_secs: 60,
                 max_pending_decisions: 50,

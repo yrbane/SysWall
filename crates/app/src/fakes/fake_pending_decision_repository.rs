@@ -25,6 +25,29 @@ impl FakePendingDecisionRepository {
             decisions: Mutex::new(HashMap::new()),
         }
     }
+
+    /// Retourne le nombre de décisions avec statut Pending.
+    /// Returns the count of decisions with Pending status.
+    pub async fn count_pending(&self) -> usize {
+        self.decisions
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|d| d.status == PendingDecisionStatus::Pending)
+            .count()
+    }
+
+    /// Retourne une copie de toutes les décisions avec statut Pending.
+    /// Returns a clone of all decisions with Pending status.
+    pub async fn snapshot_pending(&self) -> Vec<PendingDecision> {
+        self.decisions
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|d| d.status == PendingDecisionStatus::Pending)
+            .cloned()
+            .collect()
+    }
 }
 
 #[async_trait]

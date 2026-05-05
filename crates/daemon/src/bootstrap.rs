@@ -11,7 +11,7 @@ use syswall_app::services::antilockout_guard::{AntilockoutConfig as GuardConfig,
 use syswall_app::services::audit_service::AuditService;
 use syswall_app::services::connection_service::ConnectionService;
 use syswall_app::services::learning_service::{
-    LearningConfig as AppLearningConfig, LearningService,
+    LearningConfig as AppLearningConfig, LearningService, VerdictBroadcasts,
 };
 use syswall_app::services::rule_service::RuleService;
 use syswall_domain::ports::connectivity::LockoutGuard;
@@ -213,11 +213,16 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
         dns_resolver,
     ));
 
+    let verdict_broadcasts = Arc::new(VerdictBroadcasts::new());
     let learning_service = Arc::new(LearningService::new(
         pending_repo,
         decision_repo,
         notifier,
         event_bus.clone(),
+        audit_repo.clone(),
+        rule_repo.clone(),
+        default_policy,
+        verdict_broadcasts,
         AppLearningConfig {
             prompt_timeout_secs: config.learning.prompt_timeout_secs,
             max_pending_decisions: config.learning.max_pending_decisions,

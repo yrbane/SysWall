@@ -25,6 +25,16 @@ impl FakeRuleRepository {
             rules: Mutex::new(HashMap::new()),
         }
     }
+
+    /// Crée un dépôt pré-chargé avec les règles données.
+    /// Creates a repository pre-loaded with the given rules.
+    pub fn with_rules(rules: Vec<syswall_domain::entities::Rule>) -> Self {
+        let repo = Self::new();
+        for rule in rules {
+            repo.rules.lock().unwrap().insert(rule.id, rule);
+        }
+        repo
+    }
 }
 
 #[async_trait]
