@@ -15,6 +15,7 @@
     connectionList,
   } from '$lib/stores/connections';
   import { getProcessDetails, type ProcessDetails } from '$lib/api/client';
+  import { debounce } from '$lib/utils/debounce';
   import type { ConnectionEvent } from '$lib/types';
 
   // Sort state
@@ -54,12 +55,17 @@
   const urlPort = $page.url.searchParams.get('port') || '';
 
   // Filters bound to the store
-  let searchValue = $state(urlDest);
+  let searchInput = $state(urlDest);
+  let debouncedSearch = $state(urlDest);
   let protocolFilter = $state('');
   let verdictFilter = $state('');
   let directionFilter = $state('');
   let applicationFilter = $state(urlApp);
   let portFilter = $state(urlPort);
+
+  // Debounce 250 ms sur la recherche
+  const updateDebouncedSearch = debounce((v: string) => { debouncedSearch = v; }, 250);
+  $effect(() => { updateDebouncedSearch(searchInput); });
 
   // Unique application names derived from all connections
   const uniqueApps = $derived.by(() => {
@@ -70,10 +76,10 @@
     return [...apps].sort((a, b) => a.localeCompare(b, 'fr'));
   });
 
-  // Sync local state to store
+  // Sync local state to store (utilise debouncedSearch, pas searchInput)
   $effect(() => {
     connectionFilters.set({
-      search: searchValue,
+      search: debouncedSearch,
       protocol: protocolFilter,
       verdict: verdictFilter,
       direction: directionFilter,
@@ -203,7 +209,7 @@
   }
 
   function clearFilters() {
-    searchValue = '';
+    searchInput = '';
     protocolFilter = '';
     verdictFilter = '';
     directionFilter = '';
@@ -217,7 +223,7 @@
   }
 
   const hasActiveFilters = $derived(
-    searchValue || protocolFilter || verdictFilter || directionFilter || applicationFilter || portFilter
+    searchInput || protocolFilter || verdictFilter || directionFilter || applicationFilter || portFilter
   );
 
   // Column definitions for sort headers
@@ -253,7 +259,7 @@
     <Input
       type="search"
       placeholder={fr.conn_search}
-      bind:value={searchValue}
+      bind:value={searchInput}
     />
   </div>
 
