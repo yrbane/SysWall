@@ -1,8 +1,36 @@
 /* ============================================================
+   SysWall Design System — Web Fonts auto-hostées
+   ============================================================ */
+
+@font-face {
+  font-family: 'Inter Variable';
+  src: url('/fonts/inter-variable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ============================================================
    SysWall Design System — Design Tokens & Global Theme
    ============================================================ */
 
-/* --- Fonts — polices système, pas de téléchargement externe --- */
+/* --- Fonts — fallback système si les woff2 ne sont pas encore chargées --- */
 
 /* --- Design Tokens — macOS Dark Mode --- */
 :root {
