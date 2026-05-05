@@ -4369,7 +4369,6 @@ dependencies = [
  "nix",
  "rusqlite",
  "serde_json",
- "syswall-app",
  "syswall-domain",
  "tempfile",
  "tokio",
