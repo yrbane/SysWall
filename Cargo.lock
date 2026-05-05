@@ -78,6 +78,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
+name = "arrayvec"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
+
+[[package]]
 name = "assert_matches"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1230,6 +1236,15 @@ checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "etherparse"
+version = "0.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ac016aaf11dfe643edcd088a166234bfcb72e7f06691abfcf21e9af524037f4"
+dependencies = [
+ "arrayvec",
 ]
 
 [[package]]
@@ -2658,6 +2673,15 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
+
+[[package]]
+name = "nfq"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9c8f4c88952507d9df9400a6a2e48640fb460e21dcb2b4716eb3ff156d6db9e"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "nix"
@@ -4290,6 +4314,7 @@ dependencies = [
  "syswall-domain",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-util",
  "tracing",
  "uuid",
 ]
@@ -4338,6 +4363,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "uuid",
 ]
 
@@ -4364,15 +4390,19 @@ dependencies = [
  "dashmap",
  "dirs",
  "dns-lookup",
+ "etherparse",
  "futures",
  "lru",
+ "nfq",
  "nix",
  "rusqlite",
  "serde_json",
  "syswall-domain",
  "tempfile",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tracing",
  "uuid",
 ]
