@@ -235,8 +235,11 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
         default_policy,
         verdict_broadcasts,
         AppLearningConfig {
+            enabled: config.learning.enabled,
             prompt_timeout_secs: config.learning.prompt_timeout_secs,
             max_pending_decisions: config.learning.max_pending_decisions,
+            overflow_action: config.learning.overflow_action.clone(),
+            default_timeout_action: config.learning.default_timeout_action.clone(),
         },
     ));
 

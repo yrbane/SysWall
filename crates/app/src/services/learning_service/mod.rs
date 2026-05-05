@@ -23,6 +23,10 @@ use crate::commands::RespondToDecisionCommand;
 /// Configuration for the learning subsystem.
 /// Configuration du sous-système d'apprentissage.
 pub struct LearningConfig {
+    /// Activer ou désactiver le sous-système d'apprentissage.
+    /// Enable or disable the learning subsystem.
+    pub enabled: bool,
+
     /// Timeout in seconds before a pending decision expires.
     /// Délai en secondes avant qu'une décision en attente expire.
     pub prompt_timeout_secs: u64,
@@ -30,6 +34,14 @@ pub struct LearningConfig {
     /// Maximum number of pending decisions allowed in the queue.
     /// Nombre maximal de décisions en attente autorisées dans la file.
     pub max_pending_decisions: usize,
+
+    /// Action sur dépassement de quota : "allow" ou "block" (défaut).
+    /// Action on queue overflow: "allow" or "block" (default).
+    pub overflow_action: String,
+
+    /// Action sur expiration du verdict NFQUEUE : "allow" ou "block" (défaut).
+    /// Action on NFQUEUE verdict timeout: "allow" or "block" (default).
+    pub default_timeout_action: String,
 }
 
 /// Service for managing the auto-learning flow (async, non-blocking).
@@ -216,8 +228,8 @@ impl LearningService {
             Ok(Ok(verdict)) => Ok(verdict),
             Ok(Err(_)) => Ok(PacketVerdict::Drop),
             Err(_) => {
-                // Timeout : audit + Drop (le kernel droppera de toute façon à ~30s).
-                // Timeout: audit + Drop (kernel will drop on its own at ~30s anyway).
+                // Timeout : audit + action configurable.
+                // Timeout: audit + configurable action.
                 let event = AuditEvent::new(
                     Severity::Warning,
                     EventCategory::Decision,
@@ -225,7 +237,10 @@ impl LearningService {
                 )
                 .with_metadata("decision_id", id.as_uuid().to_string());
                 let _ = self.audit_repo.append(&event).await;
-                Ok(PacketVerdict::Drop)
+                Ok(match self.config.default_timeout_action.as_str() {
+                    "allow" => PacketVerdict::Accept,
+                    _ => PacketVerdict::Drop,
+                })
             }
         }
     }
@@ -236,6 +251,15 @@ impl LearningService {
         &self,
         conn: &Connection,
     ) -> Result<PacketVerdict, DomainError> {
+        // Si le sous-système d'apprentissage est désactivé, retomber sur la default policy.
+        // If the learning subsystem is disabled, fall back to the default policy.
+        if !self.config.enabled {
+            return Ok(match self.default_policy {
+                DefaultPolicy::Allow => PacketVerdict::Accept,
+                DefaultPolicy::Block | DefaultPolicy::Ask => PacketVerdict::Drop,
+            });
+        }
+
         let snapshot = conn.snapshot();
         let dedup_key = Self::dedup_key(&snapshot);
 
@@ -251,8 +275,19 @@ impl LearningService {
         // Check queue capacity.
         let pending_count = self.pending_repo.list_pending().await?.len();
         if pending_count >= self.config.max_pending_decisions {
-            tracing::warn!("Pending decision queue full ({}), dropping packet", pending_count);
-            return Ok(PacketVerdict::Drop);
+            let event = AuditEvent::new(
+                Severity::Warning,
+                EventCategory::Decision,
+                format!(
+                    "queue overflow: max_pending_decisions={} atteint",
+                    self.config.max_pending_decisions
+                ),
+            );
+            let _ = self.audit_repo.append(&event).await;
+            return Ok(match self.config.overflow_action.as_str() {
+                "allow" => PacketVerdict::Accept,
+                _ => PacketVerdict::Drop,
+            });
         }
 
         // Création d'une nouvelle PendingDecision.
@@ -329,8 +364,11 @@ mod tests {
         let verdict_broadcasts = Arc::new(VerdictBroadcasts::new());
 
         let config = LearningConfig {
+            enabled: true,
             prompt_timeout_secs: 60,
             max_pending_decisions: 50,
+            overflow_action: "block".into(),
+            default_timeout_action: "block".into(),
         };
 
         let service = LearningService::new(
@@ -516,8 +554,11 @@ mod handler_tests {
         let verdict_broadcasts = Arc::new(VerdictBroadcasts::new());
 
         let config = LearningConfig {
+            enabled: true,
             prompt_timeout_secs: 60,
             max_pending_decisions: 50,
+            overflow_action: "block".into(),
+            default_timeout_action: "block".into(),
         };
 
         let service = Arc::new(LearningService::new(

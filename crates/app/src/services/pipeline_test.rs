@@ -230,8 +230,11 @@ mod tests {
             DefaultPolicy::Block,
             Arc::new(VerdictBroadcasts::new()),
             LearningConfig {
+                enabled: true,
                 prompt_timeout_secs: 60,
                 max_pending_decisions: 50,
+                overflow_action: "block".into(),
+                default_timeout_action: "block".into(),
             },
         );
 
