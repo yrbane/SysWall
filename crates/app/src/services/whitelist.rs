@@ -44,7 +44,9 @@ pub async fn ensure_system_whitelist(
             "Allow DNS (UDP)",
             RuleCriteria {
                 protocol: Some(Protocol::Udp),
-                remote_port: Some(PortMatcher::Exact(Port::new(53).unwrap())),
+                remote_port: Some(PortMatcher::Exact(
+                    Port::new(53).expect("port 53 (DNS) est une constante IANA valide"),
+                )),
                 ..Default::default()
             },
         ),
@@ -52,7 +54,9 @@ pub async fn ensure_system_whitelist(
             "Allow DNS (TCP)",
             RuleCriteria {
                 protocol: Some(Protocol::Tcp),
-                remote_port: Some(PortMatcher::Exact(Port::new(53).unwrap())),
+                remote_port: Some(PortMatcher::Exact(
+                    Port::new(53).expect("port 53 (DNS) est une constante IANA valide"),
+                )),
                 ..Default::default()
             },
         ),
@@ -60,8 +64,12 @@ pub async fn ensure_system_whitelist(
             "Allow DHCP Client",
             RuleCriteria {
                 protocol: Some(Protocol::Udp),
-                local_port: Some(PortMatcher::Exact(Port::new(68).unwrap())),
-                remote_port: Some(PortMatcher::Exact(Port::new(67).unwrap())),
+                local_port: Some(PortMatcher::Exact(
+                    Port::new(68).expect("port 68 (DHCP client) est une constante IANA valide"),
+                )),
+                remote_port: Some(PortMatcher::Exact(
+                    Port::new(67).expect("port 67 (DHCP server) est une constante IANA valide"),
+                )),
                 direction: Some(Direction::Outbound),
                 ..Default::default()
             },
@@ -70,8 +78,12 @@ pub async fn ensure_system_whitelist(
             "Allow DHCP Server Response",
             RuleCriteria {
                 protocol: Some(Protocol::Udp),
-                local_port: Some(PortMatcher::Exact(Port::new(67).unwrap())),
-                remote_port: Some(PortMatcher::Exact(Port::new(68).unwrap())),
+                local_port: Some(PortMatcher::Exact(
+                    Port::new(67).expect("port 67 (DHCP server) est une constante IANA valide"),
+                )),
+                remote_port: Some(PortMatcher::Exact(
+                    Port::new(68).expect("port 68 (DHCP client) est une constante IANA valide"),
+                )),
                 direction: Some(Direction::Inbound),
                 ..Default::default()
             },
@@ -80,7 +92,9 @@ pub async fn ensure_system_whitelist(
             "Allow Loopback (IPv4)",
             RuleCriteria {
                 remote_ip: Some(IpMatcher::Cidr {
-                    network: "127.0.0.0".parse().unwrap(),
+                    network: "127.0.0.0"
+                        .parse()
+                        .expect("127.0.0.0 est une adresse IPv4 litterale valide"),
                     prefix_len: 8,
                 }),
                 ..Default::default()
@@ -89,7 +103,9 @@ pub async fn ensure_system_whitelist(
         create_system_rule(
             "Allow Loopback (IPv6)",
             RuleCriteria {
-                remote_ip: Some(IpMatcher::Exact("::1".parse().unwrap())),
+                remote_ip: Some(IpMatcher::Exact(
+                    "::1".parse().expect("::1 est l'adresse de loopback IPv6 litterale valide"),
+                )),
                 ..Default::default()
             },
         ),
@@ -97,7 +113,9 @@ pub async fn ensure_system_whitelist(
             "Allow NTP",
             RuleCriteria {
                 protocol: Some(Protocol::Udp),
-                remote_port: Some(PortMatcher::Exact(Port::new(123).unwrap())),
+                remote_port: Some(PortMatcher::Exact(
+                    Port::new(123).expect("port 123 (NTP) est une constante IANA valide"),
+                )),
                 direction: Some(Direction::Outbound),
                 ..Default::default()
             },
