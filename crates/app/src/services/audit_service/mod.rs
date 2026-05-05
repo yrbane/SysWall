@@ -2,10 +2,12 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use syswall_domain::entities::{AuditEvent, AuditStats, EventCategory, Severity};
+use syswall_domain::entities::AuditEvent;
 use syswall_domain::errors::DomainError;
-use syswall_domain::events::{DomainEvent, Pagination};
-use syswall_domain::ports::{AuditFilters, AuditRepository};
+use syswall_domain::ports::AuditRepository;
+
+mod command;
+mod query;
 
 /// Supported export formats for audit log data.
 /// Formats d'export supportés pour les données du journal d'audit.
@@ -76,172 +78,12 @@ impl BufferedAuditWriter {
 /// Service for recording and querying audit events.
 /// Service d'enregistrement et de consultation des événements d'audit.
 pub struct AuditService {
-    audit_repo: Arc<dyn AuditRepository>,
+    pub(super) audit_repo: Arc<dyn AuditRepository>,
 }
 
 impl AuditService {
     pub fn new(audit_repo: Arc<dyn AuditRepository>) -> Self {
         Self { audit_repo }
-    }
-
-    /// Convert a domain event into an audit event and persist it.
-    /// Convertit un événement du domaine en événement d'audit et le persiste.
-    pub async fn record_event(&self, event: &DomainEvent) -> Result<(), DomainError> {
-        let audit_event = Self::domain_event_to_audit(event);
-        match audit_event {
-            Some(ae) => self.audit_repo.append(&ae).await,
-            None => Ok(()),
-        }
-    }
-
-    /// Convert a domain event to an audit event (returns None if the event should not be recorded).
-    /// Convertit un événement du domaine en événement d'audit (retourne None si l'événement ne doit pas être enregistré).
-    pub fn domain_event_to_audit(event: &DomainEvent) -> Option<AuditEvent> {
-        match event {
-            DomainEvent::ConnectionDetected(conn) => Some(AuditEvent::new(
-                Severity::Debug,
-                EventCategory::Connection,
-                format!(
-                    "Connection detected: {} -> {}",
-                    conn.source, conn.destination
-                ),
-            )),
-            DomainEvent::ConnectionUpdated { id, state } => Some(AuditEvent::new(
-                Severity::Debug,
-                EventCategory::Connection,
-                format!("Connection updated: {:?} state={:?}", id, state),
-            )),
-            DomainEvent::ConnectionClosed(id) => Some(AuditEvent::new(
-                Severity::Debug,
-                EventCategory::Connection,
-                format!("Connection closed: {:?}", id),
-            )),
-            DomainEvent::RuleCreated(rule) => Some(
-                AuditEvent::new(
-                    Severity::Info,
-                    EventCategory::Rule,
-                    format!("Rule created: {}", rule.name),
-                )
-                .with_metadata("rule_id", rule.id.as_uuid().to_string()),
-            ),
-            DomainEvent::RuleUpdated(rule) => Some(
-                AuditEvent::new(
-                    Severity::Info,
-                    EventCategory::Rule,
-                    format!("Rule updated: {}", rule.name),
-                )
-                .with_metadata("rule_id", rule.id.as_uuid().to_string()),
-            ),
-            DomainEvent::RuleDeleted(id) => Some(AuditEvent::new(
-                Severity::Info,
-                EventCategory::Rule,
-                format!("Rule deleted: {:?}", id),
-            )),
-            DomainEvent::RuleMatched {
-                connection_id,
-                rule_id,
-                verdict,
-            } => Some(AuditEvent::new(
-                Severity::Debug,
-                EventCategory::Rule,
-                format!(
-                    "Rule {:?} matched connection {:?}: {:?}",
-                    rule_id, connection_id, verdict
-                ),
-            )),
-            DomainEvent::DecisionRequired(pd) => Some(AuditEvent::new(
-                Severity::Info,
-                EventCategory::Decision,
-                format!(
-                    "Decision required for {} -> {}",
-                    pd.connection_snapshot
-                        .process_name
-                        .as_deref()
-                        .unwrap_or("unknown"),
-                    pd.connection_snapshot.destination
-                ),
-            )),
-            DomainEvent::DecisionResolved(decision) => Some(AuditEvent::new(
-                Severity::Info,
-                EventCategory::Decision,
-                format!("Decision resolved: {:?}", decision.action),
-            )),
-            DomainEvent::DecisionExpired(id) => Some(AuditEvent::new(
-                Severity::Warning,
-                EventCategory::Decision,
-                format!("Decision expired: {:?}", id),
-            )),
-            DomainEvent::FirewallStatusChanged(status) => Some(AuditEvent::new(
-                Severity::Info,
-                EventCategory::System,
-                format!("Firewall status changed: enabled={}", status.enabled),
-            )),
-            DomainEvent::SystemError { message, severity } => {
-                Some(AuditEvent::new(*severity, EventCategory::System, message.clone()))
-            }
-            // Anti-lockout est déjà audité directement par run_guard_loop — pas de doublon ici.
-            // Anti-lockout is already audited directly by run_guard_loop — no duplicate here.
-            DomainEvent::AntilockoutTriggered { .. } => None,
-        }
-    }
-
-    /// Query audit events with optional filters and pagination.
-    /// Interroge les événements d'audit avec filtres et pagination optionnels.
-    pub async fn query_events(
-        &self,
-        filters: &AuditFilters,
-        pagination: &Pagination,
-    ) -> Result<Vec<AuditEvent>, DomainError> {
-        self.audit_repo.query(filters, pagination).await
-    }
-
-    /// Count audit events matching the given filters.
-    /// Compte les événements d'audit correspondant aux filtres donnés.
-    pub async fn count_events(&self, filters: &AuditFilters) -> Result<u64, DomainError> {
-        self.audit_repo.count(filters).await
-    }
-
-    /// Get aggregated statistics for a time range.
-    /// Obtient les statistiques agrégées pour une plage temporelle.
-    pub async fn get_stats(
-        &self,
-        from: chrono::DateTime<chrono::Utc>,
-        to: chrono::DateTime<chrono::Utc>,
-    ) -> Result<AuditStats, DomainError> {
-        self.audit_repo.get_stats(from, to).await
-    }
-
-    /// Delete events older than the given timestamp. Returns count of deleted events.
-    /// Supprime les événements antérieurs à l'horodatage donné. Retourne le nombre d'événements supprimés.
-    pub async fn delete_before(
-        &self,
-        before: chrono::DateTime<chrono::Utc>,
-    ) -> Result<u64, DomainError> {
-        self.audit_repo.delete_before(before).await
-    }
-
-    /// Export audit events matching the given filters as bytes in the specified format.
-    /// Exporte les événements d'audit correspondant aux filtres donnés en octets dans le format spécifié.
-    pub async fn export_events(
-        &self,
-        filters: &AuditFilters,
-        _format: ExportFormat,
-    ) -> Result<Vec<u8>, DomainError> {
-        // Hard limit of 100,000 events to prevent unbounded memory usage
-        let pagination = Pagination {
-            offset: 0,
-            limit: 100_000,
-        };
-        let events = self.audit_repo.query(filters, &pagination).await?;
-
-        serde_json::to_vec_pretty(&events)
-            .map_err(|e| DomainError::Infrastructure(format!("JSON serialization failed: {}", e)))
-    }
-
-    /// Get a reference to the underlying audit repository.
-    /// Obtient une référence vers le dépôt d'audit sous-jacent.
-    pub fn repo(&self) -> &Arc<dyn AuditRepository> {
-        &self.audit_repo
     }
 }
 
@@ -251,7 +93,8 @@ mod tests {
     use crate::fakes::*;
     use chrono::{Duration, Utc};
     use syswall_domain::entities::*;
-    use syswall_domain::events::FirewallStatus;
+    use syswall_domain::events::{DomainEvent, FirewallStatus};
+    use syswall_domain::ports::AuditFilters;
     use syswall_domain::value_objects::*;
 
     fn test_rule() -> Rule {
