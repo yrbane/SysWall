@@ -282,36 +282,13 @@ async fn run() -> Result<(), StartupError> {
         }
     });
 
-    // Audit cleanup -- periodically purges old events based on retention_days
-    supervisor.spawn("audit-cleanup", {
-        let audit_service = ctx.audit_service.clone();
-        let retention_days = config.database.journal_retention_days;
-        let cancel = cancel.clone();
-
-        async move {
-            let cleanup_interval = Duration::from_secs(3600); // Run hourly
-            loop {
-                tokio::select! {
-                    _ = cancel.cancelled() => break,
-                    _ = tokio::time::sleep(cleanup_interval) => {
-                        let cutoff = chrono::Utc::now()
-                            - chrono::Duration::days(retention_days as i64);
-                        match audit_service.delete_before(cutoff).await {
-                            Ok(deleted) if deleted > 0 => {
-                                info!(
-                                    "Audit cleanup: purged {} events older than {} days",
-                                    deleted, retention_days
-                                );
-                            }
-                            Err(e) => warn!("Audit cleanup error: {}", e),
-                            _ => {}
-                        }
-                    }
-                }
-            }
-            Ok(())
-        }
-    });
+    // Rotation quotidienne du journal d'audit — purge les events anterieurs a retention_days
+    // Daily audit journal rotation — purges events older than retention_days
+    syswall_app::services::journal_rotation::spawn_journal_rotation(
+        ctx.audit_service.repo().clone(),
+        config.database.journal_retention_days,
+        cancel.clone(),
+    );
 
     // Watchdog systemd — envoie WATCHDOG=1 toutes les watchdog_interval_secs/2 secondes
     // Systemd watchdog — sends WATCHDOG=1 every watchdog_interval_secs/2 seconds

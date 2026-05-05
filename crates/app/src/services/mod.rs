@@ -3,6 +3,7 @@
 pub mod antilockout_guard;
 pub mod audit_service;
 pub mod connection_service;
+pub mod journal_rotation;
 pub mod learning_service;
 #[cfg(test)]
 mod pipeline_test;
