@@ -27,8 +27,11 @@ Hors-scope : tout ce qui touche les sous-projets B/C/D/E.
 
 ## Décisions de conception (validées avec l'utilisateur)
 
-- **Probe de connectivité** : TCP configurable, défauts `1.1.1.1:53` + `[2606:4700:4700::1111]:53`, succès si **au moins un endpoint** répond. **6 tentatives** aux instants T=0, 5, 10, 15, 20, 25 s ; rollback déclenché à T=30 s si toutes ont échoué. Per-endpoint timeout 2 s (deux endpoints sondés en parallèle par tick).
+- **Probe de connectivité** : TCP configurable, défauts `1.1.1.1:53` + `[2606:4700:4700::1111]:53`, succès si **au moins un endpoint** répond. **6 tentatives** aux instants T=0, 5, 10, 15, 20, 25 s ; rollback déclenché à T=30 s si toutes ont échoué. Per-endpoint timeout 2 s (deux endpoints sondés en parallèle par tick). Liste d'endpoints **entièrement configurable** via `[antilockout] endpoints = ["..."]` dans le TOML, valeurs par défaut servies si absent ou liste vide.
 - **Privilèges daemon** : utilisateur système `syswall` avec `AmbientCapabilities` (option 2 de la discussion), pas `User=root`.
+- **Whitelist bypass du guard** : si la transaction nft ne touche **que** des règles whitelist (DNS/DHCP/NTP/loopback), le guard ne s'arme pas (sinon il s'auto-sabote en bloquant DNS). Un audit event `Severity::Warning, Category::Antilockout, "guard bypassed: whitelist-only ruleset"` est systématiquement écrit pour traçabilité — l'utilisateur voit ce bypass dans le journal d'audit, jamais silencieux.
+- **Échecs au boot** : propagation `Result<(), StartupError>` jusqu'au `main()`, qui log `error!` + `std::process::exit(78)` (EX_CONFIG, sysexits.h). Pas de `panic!` — message lisible dans `journalctl`, `Type=notify` signale l'échec à systemd, restart contrôlé par la policy `Restart=on-failure`. Variants : `StartupError::SyswallGroupMissing`, `StartupError::SocketChownFailed`, `StartupError::SocketBindFailed`.
+- **`MemoryDenyWriteExecute=false`** : conservé. Le JIT eBPF (`bpf(BPF_PROG_LOAD)`) requiert des pages WX kernel-side ; certaines distros bloquent `bpf()` sous MDWX strict. Le coût d'un breakage silencieux post-deploy l'emporte sur le gain marginal de hardening (le daemon a déjà `NoNewPrivileges`, pas d'exécution de binaires utilisateur). Décision documentée en commentaire dans le service unit et dans le CHANGELOG.
 - **Branche** : développement direct sur `main`, commits incrémentaux atomiques.
 
 ## Architecture
@@ -134,7 +137,7 @@ impl Interceptor for PeerAuthInterceptor {
 
 **Capture des credentials** : middleware `tower::Service` qui appelle `getsockopt::<PeerCredentials>` sur chaque `UnixStream` accepté et insère le résultat dans les extensions de la requête.
 
-**Boot strict** : `Group::from_name("syswall")?` ; échec → `panic!` avec message explicite. `chown` du socket `/run/syswall.sock` échoue → `panic!`.
+**Boot strict** : `Group::from_name("syswall")?` ; échec → `Err(StartupError::SyswallGroupMissing)` propagé jusqu'au `main()` qui log et `exit(78)`. Idem pour `chown` du socket `/run/syswall.sock` (`StartupError::SocketChownFailed`). Aucun `panic!`. Type=notify systemd reçoit le statut d'échec, `Restart=on-failure` ne tente pas de relancer indéfiniment (`StartLimitInterval` + `StartLimitBurst` à câbler dans le service unit).
 
 ### A.3 — Durcissement `syswall.service`
 
@@ -152,6 +155,8 @@ Type=notify
 ExecStart=/usr/bin/syswall-daemon
 Restart=on-failure
 RestartSec=5
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 # Identité
 User=syswall
@@ -175,7 +180,9 @@ RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
 SystemCallFilter=@system-service @network-io @file-system ~@privileged ~@resources ~@obsolete
 SystemCallArchitectures=native
 
-# Pas de MDWX : eBPF JIT requis
+# MDWX desactive : le JIT eBPF (BPF_PROG_LOAD) requiert des pages WX kernel-side.
+# Sous MDWX strict, certaines distros bloquent le syscall bpf(). Compense par
+# NoNewPrivileges + pas d'execution de binaires utilisateur.
 MemoryDenyWriteExecute=false
 
 # Répertoires gérés par systemd (mode 0750, owned syswall:syswall)
@@ -231,18 +238,20 @@ Server::builder()
 apply_ruleset(rules)
     ├── snapshot()      → handle
     ├── nft -f new      (atomique)
-    ├── if !whitelist_only(rules):
-    │       guard.arm(handle)
-    │       spawn:
-    │           for tick in 0..6:
-    │               if tick > 0: sleep(5s)
-    │               if probe.probe().await? == Reachable:
-    │                   guard.confirm()
-    │                   audit(Info, "anti-lockout: connectivity confirmed")
-    │                   return
-    │           firewall.rollback(handle)
-    │           audit(Critical, "anti-lockout: connectivity lost, rolled back")
-    │           emit_event(AntilockoutTriggered)
+    ├── if whitelist_only(rules):
+    │       audit(Warning, "anti-lockout: bypass (whitelist-only ruleset)")
+    │       return Ok
+    ├── guard.arm(handle)
+    ├── spawn:
+    │       for tick in 0..6:
+    │           if tick > 0: sleep(5s)
+    │           if probe.probe().await? == Reachable:
+    │               guard.confirm()
+    │               audit(Info, "anti-lockout: connectivity confirmed")
+    │               return
+    │       firewall.rollback(handle)
+    │       audit(Critical, "anti-lockout: connectivity lost, rolled back")
+    │       emit_event(AntilockoutTriggered)
     └── return Ok
 ```
 
