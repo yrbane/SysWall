@@ -60,3 +60,17 @@ All notable changes documented here.
 - **Smoke test** gate par `SYSWALL_TEST_NFQUEUE` dans `crates/daemon/tests/nfqueue_smoke_test.rs`.
 
 Dependances Cargo ajoutees : `nfq = "0.2.5"`, `etherparse = "0.20"` (workspace, dans `crates/infra/Cargo.toml`).
+
+### UX & Accessibility
+
+- **Killswitch immediat + toast undo 5 s** : plus de modal de confirmation paradoxal sur une action d'urgence ; un undo persistant 5 s couvre les mistaps mobile.
+- **Raccourcis clavier popup decision** : `a`/`Enter` (autoriser une fois), `b` (bloquer une fois), `Shift+A` (toujours autoriser), `Shift+B` (toujours bloquer), `i` (ignorer), `Esc` (ignorer). Touches affichees via balises `<kbd>`.
+- **Page Audit virtualisee** : remplacement de la pagination par `Table.svelte` virtual scroll. Scroll fluide sur >= 5000 evenements.
+- **Modal focus trap** + restitution du focus a la fermeture (action Svelte `focusTrap`). Conformite WCAG 2.4.3.
+- **Contraste WCAG AA** : `--text-tertiary` remonte de `#636366` (3.4:1) a `#8e8e93` (4.6:1). Nouveau token `--text-disabled` pour les usages decoratifs uniquement. `--text-secondary` passe a `#c7c7cc` pour preserver la hierarchie.
+- **Debounce filtres** : recherche Connexions et Audit debouncee 250 ms.
+- **Toggles regles** : `role="switch"` + `aria-checked` pour lecteurs d'ecran.
+- **Sidebar mobile** : tap targets >= 44x44 px (WCAG 2.5.5).
+- **Toast extensible** : nouveau champ `action?: { label, handler }` + barre de progression visuelle.
+
+Nouveaux utilitaires : `crates/ui/src/lib/utils/debounce.ts`, `crates/ui/src/lib/actions/focus_trap.ts`.
