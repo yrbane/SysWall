@@ -102,6 +102,40 @@
     }
     onrespond(action, granularity);
   }
+
+  // Raccourcis clavier : a=autoriser, b=bloquer, i/Esc=ignorer, Shift pour permanent
+  // Keyboard shortcuts: a=allow, b=block, i/Esc=ignore, Shift for permanent
+  function onKeydown(e: KeyboardEvent) {
+    if (
+      e.target instanceof HTMLInputElement ||
+      e.target instanceof HTMLTextAreaElement ||
+      e.target instanceof HTMLSelectElement
+    ) {
+      return;
+    }
+    const key = e.key.toLowerCase();
+    switch (key) {
+      case 'enter':
+      case 'a':
+        handleAction(e.shiftKey ? 'always_allow' : 'allow_once');
+        e.preventDefault();
+        break;
+      case 'b':
+        handleAction(e.shiftKey ? 'always_block' : 'block_once');
+        e.preventDefault();
+        break;
+      case 'i':
+      case 'escape':
+        handleAction('ignore');
+        e.preventDefault();
+        break;
+    }
+  }
+
+  onMount(() => {
+    window.addEventListener('keydown', onKeydown);
+    return () => window.removeEventListener('keydown', onKeydown);
+  });
 </script>
 
 <div
@@ -186,18 +220,18 @@
   <div class="actions">
     <div class="actions-row">
       <Button variant="success" size="sm" disabled={responding} onclick={() => handleAction('allow_once')}>
-        {fr.learn_allow_once}
+        {fr.learn_allow_once}<kbd>A</kbd>
       </Button>
       <Button variant="danger" size="sm" disabled={responding} onclick={() => handleAction('block_once')}>
-        {fr.learn_block_once}
+        {fr.learn_block_once}<kbd>B</kbd>
       </Button>
     </div>
     <div class="actions-row">
       <Button variant="success" size="sm" disabled={responding} onclick={() => handleAction('always_allow')}>
-        {fr.learn_always_allow}
+        {fr.learn_always_allow}<kbd>⇧A</kbd>
       </Button>
       <Button variant="danger" size="sm" disabled={responding} onclick={() => handleAction('always_block')}>
-        {fr.learn_always_block}
+        {fr.learn_always_block}<kbd>⇧B</kbd>
       </Button>
     </div>
     <div class="actions-row">
@@ -205,7 +239,7 @@
         {fr.learn_create_rule}
       </Button>
       <Button variant="ghost" size="sm" disabled={responding} onclick={() => handleAction('ignore')}>
-        {fr.learn_ignore}
+        {fr.learn_ignore}<kbd>I</kbd>
       </Button>
     </div>
   </div>
@@ -349,5 +383,18 @@
 
   .actions-row > :global(*) {
     flex: 1;
+  }
+
+  kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    margin-left: 6px;
+    font-size: 0.85em;
+    font-family: var(--font-mono, monospace);
+    background: var(--bg-tertiary, #2c2c2e);
+    border: 1px solid var(--border-primary, #3a3a3c);
+    border-radius: 3px;
+    color: var(--text-secondary);
+    vertical-align: middle;
   }
 </style>
