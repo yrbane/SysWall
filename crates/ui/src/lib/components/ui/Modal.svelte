@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { focusTrap } from '$lib/actions/focus_trap';
 
   interface Props {
     open: boolean;
@@ -33,7 +34,7 @@
     aria-modal="true"
     aria-label={title}
   >
-    <div class="modal-content" style="max-width: {sizeMap[size]};">
+    <div class="modal-content" style="max-width: {sizeMap[size]};" use:focusTrap>
       <div class="modal-header">
         <h2 class="modal-title">{title}</h2>
         <button class="modal-close" onclick={onclose} aria-label="Fermer">
