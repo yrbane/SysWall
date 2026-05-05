@@ -4323,6 +4323,7 @@ dependencies = [
 name = "syswall-daemon"
 version = "0.2.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "futures",
  "http",
