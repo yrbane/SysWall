@@ -330,6 +330,10 @@ async fn run() -> Result<(), StartupError> {
         }
     });
 
+    // Lance l'intercepteur NFQUEUE (mode dégradé si CAP_NET_ADMIN absent)
+    // Launch the NFQUEUE interceptor (degraded mode if CAP_NET_ADMIN is missing)
+    bootstrap::wire_nfqueue(&ctx, &config, cancel.clone());
+
     info!("SysWall daemon ready");
 
     // Notify systemd that we're ready

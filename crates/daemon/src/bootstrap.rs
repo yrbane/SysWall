@@ -4,6 +4,9 @@ use std::time::Duration;
 
 use tracing::{info, warn};
 
+use syswall_domain::ports::interception::{PacketDecisionHandler, PacketInterceptor};
+use syswall_infra::nfqueue::{NfqueueInterceptor, OverflowPolicy};
+
 use syswall_app::fakes::{
     FakeConnectionMonitor, FakeFirewallEngine, FakeProcessResolver, FakeUserNotifier,
 };
@@ -241,4 +244,51 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
         firewall,
         rule_repo,
     })
+}
+
+/// Lance le worker NFQUEUE en tâche de fond via le superviseur fourni.
+/// Spawn the NFQUEUE interception worker as a background task via the given supervisor.
+///
+/// Doit être appelé après `bootstrap()`, une fois que le superviseur est créé.
+/// Must be called after `bootstrap()`, once the supervisor is created.
+pub fn wire_nfqueue(
+    ctx: &AppContext,
+    config: &crate::config::SysWallConfig,
+    cancel: tokio_util::sync::CancellationToken,
+) {
+    let nfq_cfg = config.nfqueue.clone().unwrap_or_default();
+    if !nfq_cfg.enabled {
+        warn!(target: "nfqueue", "interception disabled by config — observation-only mode");
+        return;
+    }
+
+    let overflow = match nfq_cfg.overflow_policy.as_str() {
+        "accept" => OverflowPolicy::Accept,
+        _ => OverflowPolicy::Block,
+    };
+    let interceptor: Arc<dyn PacketInterceptor> = Arc::new(NfqueueInterceptor::new(
+        nfq_cfg.queue_num,
+        nfq_cfg.max_queued,
+        overflow,
+    ));
+    let handler: Arc<dyn PacketDecisionHandler> = ctx.learning_service.clone();
+    let audit_repo = ctx.audit_service.repo().clone();
+
+    tokio::spawn(async move {
+        match interceptor.run(handler, cancel).await {
+            Ok(()) => {
+                tracing::info!(target: "nfqueue", "interception loop terminated cleanly");
+            }
+            Err(e) => {
+                tracing::error!(target: "nfqueue", "interception failed (mode degrade): {e}");
+                // Audit the boot failure so it shows up in the journal.
+                let event = syswall_domain::entities::AuditEvent::new(
+                    syswall_domain::entities::Severity::Error,
+                    syswall_domain::entities::EventCategory::System,
+                    format!("nfqueue interception failed (mode degrade): {e}"),
+                );
+                let _ = audit_repo.append(&event).await;
+            }
+        }
+    });
 }
