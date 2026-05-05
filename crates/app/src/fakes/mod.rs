@@ -2,6 +2,7 @@
 /// Implémentations factices (en mémoire) de tous les ports du domaine pour les tests.
 pub mod fake_audit_repository;
 pub mod fake_connection_monitor;
+pub mod fake_connectivity_probe;
 pub mod fake_decision_repository;
 pub mod fake_dns_resolver;
 pub mod fake_event_bus;
@@ -13,6 +14,7 @@ pub mod fake_user_notifier;
 
 pub use fake_audit_repository::*;
 pub use fake_connection_monitor::*;
+pub use fake_connectivity_probe::*;
 pub use fake_decision_repository::*;
 pub use fake_dns_resolver::*;
 pub use fake_event_bus::*;
