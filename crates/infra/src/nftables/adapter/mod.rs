@@ -61,6 +61,9 @@ pub struct NftablesFirewallAdapter {
     started_at: Instant,
     pub(super) nftables_synced: Mutex<bool>,
     lockout_guard: Option<Arc<dyn syswall_domain::ports::connectivity::LockoutGuard>>,
+    /// Numéro de queue NFQUEUE pour la chaîne d'interception (None = désactivé).
+    /// NFQUEUE queue number for the interception chain (None = disabled).
+    interception_queue: Option<u16>,
 }
 
 impl std::fmt::Debug for NftablesFirewallAdapter {
@@ -89,7 +92,15 @@ impl NftablesFirewallAdapter {
             started_at: Instant::now(),
             nftables_synced: Mutex::new(false),
             lockout_guard: None,
+            interception_queue: None,
         })
+    }
+
+    /// Active la chaîne d'interception NFQUEUE avec le numéro de queue donné.
+    /// Enable the NFQUEUE interception chain with the given queue number.
+    pub fn with_interception_queue(mut self, queue_num: u16) -> Self {
+        self.interception_queue = Some(queue_num);
+        self
     }
 
     /// Attache un guard anti-lockout à l'adaptateur.
@@ -157,6 +168,48 @@ impl NftablesFirewallAdapter {
         for (chain, hook) in [("input", "input"), ("output", "output"), ("forward", "forward")] {
             self.execute_nft(&NftCommandBuilder::create_chain(table, chain, hook, 0))
                 .await?;
+        }
+
+        // Chaîne d'interception NFQUEUE (optionnelle, si configurée).
+        // NFQUEUE interception chain (optional, if configured).
+        if let Some(queue_num) = self.interception_queue {
+            // Crée la chaîne d'interception (idempotent — "File exists" ignoré par execute_nft).
+            // Create the interception chain (idempotent — "File exists" ignored by execute_nft).
+            self.execute_nft(
+                &NftCommandBuilder::create_chain(table, "interception", "output", 0)
+            )
+            .await?;
+
+            // Règle loopback : évite tout deadlock IPC.
+            // Loopback rule: avoid any IPC deadlock.
+            let lo_rule = NftCommandBuilder::add_rule(table, "interception")
+                .arg("iif")
+                .arg("lo")
+                .arg("accept");
+            // Ignore "File exists" for rules too (idempotent boot).
+            // Ignore "File exists" pour les règles (boot idempotent).
+            let _ = self.execute_nft(&lo_rule).await;
+
+            // Règle NFQUEUE : queue le premier paquet de chaque nouveau flux sortant.
+            // bypass = fail-open si le démon ne consomme plus la queue.
+            // NFQUEUE rule: queue the first packet of every new outbound flow.
+            // bypass = fail-open if the daemon stops consuming the queue.
+            let nfq_rule = NftCommandBuilder::add_rule(table, "interception")
+                .arg("ct")
+                .arg("state")
+                .arg("new")
+                .arg("queue")
+                .arg("num")
+                .arg(queue_num.to_string())
+                .arg("bypass");
+            let _ = self.execute_nft(&nfq_rule).await;
+
+            info!(
+                target: "nfqueue",
+                table = %table,
+                queue_num = queue_num,
+                "chaîne d'interception NFQUEUE installée"
+            );
         }
 
         Ok(())

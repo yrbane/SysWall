@@ -3,6 +3,7 @@
 
 mod criteria;
 mod verdict;
+pub mod interception_chain;
 
 use syswall_domain::entities::{Rule, RuleEffect};
 use syswall_domain::value_objects::Direction;

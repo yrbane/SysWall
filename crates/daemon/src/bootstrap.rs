@@ -131,6 +131,14 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
             nft_adapter
         };
 
+        // Activation de la chaîne d'interception NFQUEUE si configurée.
+        // Enable the NFQUEUE interception chain if configured.
+        let nft_adapter = if let Some(nfq) = config.nfqueue.as_ref().filter(|c| c.enabled) {
+            nft_adapter.with_interception_queue(nfq.queue_num)
+        } else {
+            nft_adapter
+        };
+
         Arc::new(nft_adapter)
     };
 
