@@ -21,6 +21,8 @@ use crate::grpc::{SysWallControlService, SysWallEventService, start_grpc_server}
 use crate::startup_error::StartupError;
 use crate::supervisor::Supervisor;
 
+use syswall_domain::entities::AuditEvent as DomainAuditEvent;
+
 /// Initialise le filtre de tracing avant tout autre code.
 fn init_tracing() {
     tracing_subscriber::fmt()
@@ -77,6 +79,18 @@ async fn run() -> Result<(), StartupError> {
         }
         Err(e) => error!("Failed to load rules for sync: {}", e),
     }
+
+    // Résolution du GID du groupe 'syswall' — erreur fatale si absent
+    // Resolve the 'syswall' group GID — fatal error if missing
+    let syswall_gid: u32 = nix::unistd::Group::from_name("syswall")
+        .map_err(|e| StartupError::ConfigInvalid(format!("getgrnam: {e}")))?
+        .ok_or(StartupError::SyswallGroupMissing)?
+        .gid
+        .as_raw();
+
+    // Canal d'audit pour l'interceptor gRPC — les événements sont drainés par le listener d'audit
+    // Audit channel for the gRPC interceptor — events are drained by the audit listener
+    let (grpc_audit_tx, mut grpc_audit_rx) = tokio::sync::mpsc::channel::<DomainAuditEvent>(64);
 
     // Supervisor
     let cancel = CancellationToken::new();
@@ -153,9 +167,38 @@ async fn run() -> Result<(), StartupError> {
         let event_service = SysWallEventService::new(ctx.event_bus.clone());
         let socket_path = config.daemon.socket_path.clone();
         let cancel = cancel.clone();
+        let audit_tx = grpc_audit_tx.clone();
 
         async move {
-            start_grpc_server(socket_path, control_service, event_service, cancel).await
+            start_grpc_server(socket_path, control_service, event_service, syswall_gid, audit_tx, cancel)
+                .await
+                .map_err(|e| e.to_string())
+        }
+    });
+
+    // Tâche de drain du canal d'audit gRPC — persiste les événements de refus d'accès
+    // gRPC audit drain task — persists access-denied audit events
+    supervisor.spawn("grpc-audit-drain", {
+        let audit_repo = ctx.audit_service.repo().clone();
+        let cancel = cancel.clone();
+
+        async move {
+            loop {
+                tokio::select! {
+                    _ = cancel.cancelled() => break,
+                    event = grpc_audit_rx.recv() => {
+                        match event {
+                            Some(e) => {
+                                if let Err(err) = audit_repo.append(&e).await {
+                                    warn!("grpc-audit-drain: échec d'enregistrement: {}", err);
+                                }
+                            }
+                            None => break,
+                        }
+                    }
+                }
+            }
+            Ok(())
         }
     });
 

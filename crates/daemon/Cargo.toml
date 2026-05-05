@@ -20,7 +20,7 @@ toml = { workspace = true }
 chrono = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
-nix = { workspace = true }
+nix = { workspace = true, features = ["socket"] }
 hyper = { workspace = true }
 hyper-util = { workspace = true }
 tower = { workspace = true }
