@@ -31,3 +31,9 @@ integration = []
 [dev-dependencies]
 tokio = { workspace = true }
 tempfile = "3"
+criterion = { version = "0.5", features = ["html_reports"] }
+etherparse = { workspace = true }
+
+[[bench]]
+name = "nfq_parser_bench"
+harness = false
