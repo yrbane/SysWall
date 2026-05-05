@@ -148,4 +148,13 @@ mod tests {
         );
         assert_eq!(event.category, EventCategory::Authentication);
     }
+
+    #[test]
+    fn event_category_serde_roundtrip_for_new_variants() {
+        for cat in [EventCategory::Antilockout, EventCategory::Authentication] {
+            let json = serde_json::to_string(&cat).unwrap();
+            let back: EventCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, cat);
+        }
+    }
 }

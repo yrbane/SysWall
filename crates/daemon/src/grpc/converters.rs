@@ -30,6 +30,8 @@ pub fn domain_error_to_status(e: DomainError) -> tonic::Status {
         DomainError::AlreadyExists(msg) => tonic::Status::already_exists(msg),
         DomainError::Infrastructure(msg) => tonic::Status::internal(msg),
         DomainError::NotPermitted(msg) => tonic::Status::permission_denied(msg),
+        // FAILED_PRECONDITION : etat systeme (perte de connectivite) qui empeche l'operation, pas un conflit transitoire.
+        // FAILED_PRECONDITION: system state (connectivity loss) prevented the operation — not a transient conflict.
         DomainError::AntilockoutTriggered { .. } => tonic::Status::failed_precondition(e.to_string()),
     }
 }
