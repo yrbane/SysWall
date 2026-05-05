@@ -46,11 +46,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: box-shadow var(--transition-base);
+    transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
   }
 
   .stat-card:hover {
-    border-color: var(--border-primary);
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   }
 
   .stat-content {
