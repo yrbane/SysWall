@@ -121,6 +121,7 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
                     timeout: Duration::from_secs(al_cfg.timeout_secs),
                     probe_interval: Duration::from_secs(al_cfg.probe_interval_secs),
                 },
+                event_bus.clone(),
             ));
             nft_adapter.with_lockout_guard(guard as Arc<dyn LockoutGuard>)
         } else {

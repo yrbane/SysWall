@@ -31,6 +31,9 @@ pub enum DomainEvent {
         message: String,
         severity: Severity,
     },
+    /// Anti-lockout fired: the recent ruleset change was rolled back due to lost connectivity.
+    /// Anti-lockout déclenché : le changement de ruleset a été annulé suite à une perte de connectivité.
+    AntilockoutTriggered { rolled_back_count: usize },
 }
 
 /// Overall firewall status.

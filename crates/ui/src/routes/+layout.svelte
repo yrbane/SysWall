@@ -11,6 +11,7 @@
   import { fetchRules, initRuleListeners, rulesCount } from '$lib/stores/rules';
   import { fetchPendingDecisions, initDecisionListeners, pendingCount } from '$lib/stores/decisions';
   import { initAuditListener } from '$lib/stores/audit';
+  import { initAntilockoutListener } from '$lib/stores/antilockout';
   import { startTrafficTrend, stopTrafficTrend } from '$lib/stores/dashboard';
   import { setNetworkEnabled } from '$lib/api/client';
   import { onMount } from 'svelte';
@@ -73,6 +74,7 @@
     const unRules = initRuleListeners();
     const unDecisions = initDecisionListeners();
     const unAudit = initAuditListener();
+    const unAntilockout = initAntilockoutListener();
     startTrafficTrend();
 
     return () => {
@@ -81,6 +83,7 @@
       unRules();
       unDecisions();
       unAudit();
+      unAntilockout();
       stopTrafficTrend();
     };
   });

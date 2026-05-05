@@ -24,6 +24,7 @@ fn map_event_name(event_type: &str) -> &str {
         "decision_expired" => "syswall://decision-expired",
         "firewall_status_changed" => "syswall://status-changed",
         "system_error" => "syswall://system-error",
+        "antilockout_triggered" => "syswall://antilockout-triggered",
         other => {
             warn!("Unknown event type: {}", other);
             "syswall://unknown"

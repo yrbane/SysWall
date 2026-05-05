@@ -204,6 +204,10 @@ pub fn domain_event_to_proto(event: &DomainEvent) -> DomainEventMessage {
             "system_error",
             serde_json::json!({ "message": message, "severity": severity }).to_string(),
         ),
+        DomainEvent::AntilockoutTriggered { rolled_back_count } => (
+            "antilockout_triggered",
+            serde_json::json!({ "rolled_back_count": rolled_back_count }).to_string(),
+        ),
     };
 
     DomainEventMessage {

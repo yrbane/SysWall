@@ -9,8 +9,9 @@ use tokio::task::JoinHandle;
 
 use syswall_domain::entities::{AuditEvent, EventCategory, Severity};
 use syswall_domain::errors::DomainError;
+use syswall_domain::events::DomainEvent;
 use syswall_domain::ports::connectivity::{ConnectivityProbe, ProbeOutcome};
-use syswall_domain::ports::AuditRepository;
+use syswall_domain::ports::{AuditRepository, EventBus};
 
 /// Future retourné par un callback de rollback.
 /// Future returned by a rollback callback.
@@ -62,6 +63,7 @@ pub struct AntilockoutGuard {
     audit: Arc<dyn AuditRepository>,
     config: AntilockoutConfig,
     state: Arc<Mutex<Option<ArmedState>>>,
+    event_bus: Arc<dyn EventBus>,
 }
 
 impl AntilockoutGuard {
@@ -69,12 +71,14 @@ impl AntilockoutGuard {
         probe: Arc<dyn ConnectivityProbe>,
         audit: Arc<dyn AuditRepository>,
         config: AntilockoutConfig,
+        event_bus: Arc<dyn EventBus>,
     ) -> Self {
         Self {
             probe,
             audit,
             config,
             state: Arc::new(Mutex::new(None)),
+            event_bus,
         }
     }
 
@@ -95,9 +99,10 @@ impl AntilockoutGuard {
         let probe = self.probe.clone();
         let audit = self.audit.clone();
         let config = self.config.clone();
+        let event_bus = self.event_bus.clone();
         let state_clone = self.state.clone();
         let join_handle = tokio::spawn(async move {
-            run_guard_loop(probe, audit, config, rolled_back_count, rollback, cancel_rx).await;
+            run_guard_loop(probe, audit, config, event_bus, rolled_back_count, rollback, cancel_rx).await;
             *state_clone.lock().await = None;
         });
         *state = Some(ArmedState { cancel_tx, join_handle });
@@ -128,6 +133,7 @@ async fn run_guard_loop(
     probe: Arc<dyn ConnectivityProbe>,
     audit: Arc<dyn AuditRepository>,
     config: AntilockoutConfig,
+    event_bus: Arc<dyn EventBus>,
     rolled_back_count: usize,
     rollback: RollbackFn,
     mut cancel_rx: oneshot::Receiver<()>,
@@ -183,6 +189,14 @@ async fn run_guard_loop(
     }
     .with_metadata("rolled_back_count", rolled_back_count.to_string());
     let _ = audit.append(&event).await;
+
+    // Émet l'événement domaine si le rollback a réussi.
+    // Emit domain event only when rollback succeeded.
+    if rollback_result.is_ok() {
+        let _ = event_bus
+            .publish(DomainEvent::AntilockoutTriggered { rolled_back_count })
+            .await;
+    }
 }
 
 #[async_trait::async_trait]
@@ -204,17 +218,22 @@ mod tests {
     use super::*;
     use crate::fakes::fake_audit_repository::FakeAuditRepository;
     use crate::fakes::fake_connectivity_probe::FakeConnectivityProbe;
+    use crate::fakes::fake_event_bus::FakeEventBus;
     use syswall_domain::ports::connectivity::ProbeOutcome;
 
     fn noop_rollback() -> RollbackFn {
         Box::new(|| Box::pin(async { Ok(()) }))
     }
 
+    fn fake_bus() -> Arc<FakeEventBus> {
+        Arc::new(FakeEventBus::new())
+    }
+
     #[tokio::test(start_paused = true)]
     async fn arm_then_probe_reachable_does_not_rollback() {
         let probe = Arc::new(FakeConnectivityProbe::always_reachable());
         let audit = Arc::new(FakeAuditRepository::new());
-        let guard = AntilockoutGuard::new(probe, audit.clone(), AntilockoutConfig::default());
+        let guard = AntilockoutGuard::new(probe, audit.clone(), AntilockoutConfig::default(), fake_bus());
         guard.arm(2, noop_rollback()).await.unwrap();
         // Céder la main pour que la tâche spawned exécute son premier probe à T=0.
         tokio::task::yield_now().await;
@@ -227,7 +246,7 @@ mod tests {
     async fn arm_already_armed_returns_error() {
         let probe = Arc::new(FakeConnectivityProbe::always_unreachable());
         let audit = Arc::new(FakeAuditRepository::new());
-        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default());
+        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default(), fake_bus());
         guard.arm(1, noop_rollback()).await.unwrap();
         let err = guard.arm(1, noop_rollback()).await.unwrap_err();
         assert_eq!(err, GuardError::AlreadyArmed);
@@ -238,7 +257,7 @@ mod tests {
     async fn confirm_when_not_armed_returns_error() {
         let probe = Arc::new(FakeConnectivityProbe::always_reachable());
         let audit = Arc::new(FakeAuditRepository::new());
-        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default());
+        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default(), fake_bus());
         let err = guard.confirm().await.unwrap_err();
         assert_eq!(err, GuardError::NotArmed);
     }
@@ -247,7 +266,11 @@ mod tests {
     async fn all_probes_unreachable_triggers_rollback() {
         let probe = Arc::new(FakeConnectivityProbe::always_unreachable());
         let audit = Arc::new(FakeAuditRepository::new());
-        let guard = AntilockoutGuard::new(probe, audit.clone(), AntilockoutConfig::default());
+        let bus = fake_bus();
+        // Abonnement avant l'armement pour capturer l'événement domaine publié ultérieurement.
+        // Subscribe before arming so we can capture the domain event published later.
+        let mut rx = bus.sender().subscribe();
+        let guard = AntilockoutGuard::new(probe, audit.clone(), AntilockoutConfig::default(), bus.clone());
         let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let counter_clone = counter.clone();
         let rollback: RollbackFn = Box::new(move || {
@@ -277,6 +300,12 @@ mod tests {
             .iter()
             .any(|e| e.severity == syswall_domain::entities::Severity::Critical
                 && e.category == syswall_domain::entities::EventCategory::Antilockout));
+        // Vérifie que l'événement domaine AntilockoutTriggered a été publié.
+        // Verify that the AntilockoutTriggered domain event was published.
+        assert!(
+            matches!(rx.try_recv(), Ok(DomainEvent::AntilockoutTriggered { rolled_back_count: 3 })),
+            "AntilockoutTriggered domain event not published"
+        );
     }
 
     #[tokio::test(start_paused = true)]
@@ -290,7 +319,7 @@ mod tests {
             Ok(ProbeOutcome::Reachable),
         ]));
         let audit = Arc::new(FakeAuditRepository::new());
-        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default());
+        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default(), fake_bus());
         let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let counter_clone = counter.clone();
         let rollback: RollbackFn = Box::new(move || {
@@ -322,7 +351,7 @@ mod tests {
         use syswall_domain::ports::connectivity::{ArmedRollback, LockoutGuard};
         let probe = Arc::new(FakeConnectivityProbe::always_reachable());
         let audit = Arc::new(FakeAuditRepository::new());
-        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default());
+        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default(), fake_bus());
         let rb: ArmedRollback = Box::new(|| Box::pin(async { Ok(()) }));
         let res = LockoutGuard::arm_rollback(&guard, 1, rb).await;
         assert!(res.is_ok());
@@ -332,7 +361,7 @@ mod tests {
     async fn manual_confirm_cancels_timer() {
         let probe = Arc::new(FakeConnectivityProbe::always_unreachable());
         let audit = Arc::new(FakeAuditRepository::new());
-        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default());
+        let guard = AntilockoutGuard::new(probe, audit, AntilockoutConfig::default(), fake_bus());
         let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let counter_clone = counter.clone();
         let rollback: RollbackFn = Box::new(move || {
