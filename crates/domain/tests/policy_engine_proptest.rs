@@ -330,6 +330,39 @@ proptest! {
             &criteria_v6,
             &connection_to(IpAddr::V4(Ipv4Addr::from(v4))),
         ));
+        let matcher_v6_exact = IpMatcher::Exact(IpAddr::V6(Ipv6Addr::from(v6)));
+        let criteria_v6_exact = RuleCriteria {
+            remote_ip: Some(matcher_v6_exact),
+            application: None,
+            user: None,
+            remote_port: None,
+            local_port: None,
+            protocol: None,
+            direction: None,
+            schedule: None,
+        };
+        prop_assert!(!PolicyEngine::matches(
+            &criteria_v6_exact,
+            &connection_to(IpAddr::V4(Ipv4Addr::from(v4))),
+        ));
+        let matcher_v4_cidr = IpMatcher::Cidr {
+            network: IpAddr::V4(Ipv4Addr::from(v4)),
+            prefix_len: 24,
+        };
+        let criteria_v4_cidr = RuleCriteria {
+            remote_ip: Some(matcher_v4_cidr),
+            application: None,
+            user: None,
+            remote_port: None,
+            local_port: None,
+            protocol: None,
+            direction: None,
+            schedule: None,
+        };
+        prop_assert!(!PolicyEngine::matches(
+            &criteria_v4_cidr,
+            &connection_to(IpAddr::V6(Ipv6Addr::from(v6))),
+        ));
     }
 
     /// Les bornes d'un PortMatcher::Range sont inclusives.
