@@ -92,13 +92,19 @@ pub(super) fn parse_decision_action(s: &str) -> Result<DecisionAction, tonic::St
         // Defer prend un suffixe de duree obligatoire : "defer:300" pour 5 minutes.
         // Defer requires a mandatory duration suffix: "defer:300" for 5 minutes.
         other if other.starts_with("defer:") => {
-            let duration = other.strip_prefix("defer:")
+            let duration = other
+                .strip_prefix("defer:")
                 .and_then(|d| d.parse::<u64>().ok())
                 .filter(|&d| d > 0 && d <= 86_400)
-                .ok_or_else(|| tonic::Status::invalid_argument(
-                    "Defer requires a positive duration in seconds (max 86400): 'defer:N'".to_string()
-                ))?;
-            Ok(DecisionAction::Defer { duration_secs: duration })
+                .ok_or_else(|| {
+                    tonic::Status::invalid_argument(
+                        "Defer requires a positive duration in seconds (max 86400): 'defer:N'"
+                            .to_string(),
+                    )
+                })?;
+            Ok(DecisionAction::Defer {
+                duration_secs: duration,
+            })
         }
         _ => Err(tonic::Status::invalid_argument(format!(
             "Unknown decision action: '{}'. Expected: allow_once, block_once, always_allow, always_block, create_rule, ignore, defer:N",
@@ -191,7 +197,9 @@ mod tests {
         );
         assert_eq!(
             parse_decision_action("defer:86400").unwrap(),
-            DecisionAction::Defer { duration_secs: 86400 }
+            DecisionAction::Defer {
+                duration_secs: 86400
+            }
         );
     }
 

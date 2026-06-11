@@ -189,13 +189,21 @@ pub struct AntilockoutConfig {
     pub per_endpoint_timeout_secs: u64,
 }
 
-fn default_antilockout_enabled() -> bool { true }
+fn default_antilockout_enabled() -> bool {
+    true
+}
 fn default_antilockout_endpoints() -> Vec<String> {
     vec!["1.1.1.1:53".into(), "[2606:4700:4700::1111]:53".into()]
 }
-fn default_antilockout_timeout() -> u64 { 30 }
-fn default_antilockout_probe_interval() -> u64 { 5 }
-fn default_antilockout_per_endpoint_timeout() -> u64 { 2 }
+fn default_antilockout_timeout() -> u64 {
+    30
+}
+fn default_antilockout_probe_interval() -> u64 {
+    5
+}
+fn default_antilockout_per_endpoint_timeout() -> u64 {
+    2
+}
 
 impl Default for AntilockoutConfig {
     fn default() -> Self {
@@ -245,10 +253,18 @@ pub struct NfqueueConfig {
     pub overflow_policy: String, // "block" or "accept"
 }
 
-fn default_nfq_enabled() -> bool { true }
-fn default_nfq_queue_num() -> u16 { 0 }
-fn default_nfq_max_queued() -> u32 { 1024 }
-fn default_nfq_overflow_policy() -> String { "block".to_string() }
+fn default_nfq_enabled() -> bool {
+    true
+}
+fn default_nfq_queue_num() -> u16 {
+    0
+}
+fn default_nfq_max_queued() -> u32 {
+    1024
+}
+fn default_nfq_overflow_policy() -> String {
+    "block".to_string()
+}
 
 impl Default for NfqueueConfig {
     fn default() -> Self {
@@ -334,7 +350,10 @@ enabled = true
         let config = SysWallConfig::from_toml(TEST_CONFIG).unwrap();
         assert_eq!(config.config_version, 1);
         assert_eq!(config.daemon.log_level, "info");
-        assert!(matches!(config.firewall.default_policy, DefaultPolicyConfig::Ask));
+        assert!(matches!(
+            config.firewall.default_policy,
+            DefaultPolicyConfig::Ask
+        ));
         assert_eq!(config.learning.prompt_timeout_secs, 60);
         assert_eq!(config.ui.locale, "fr");
     }

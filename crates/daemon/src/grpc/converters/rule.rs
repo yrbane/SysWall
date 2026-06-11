@@ -46,7 +46,9 @@ pub fn proto_to_create_rule_cmd(
     req: &CreateRuleRequest,
 ) -> Result<CreateRuleCommand, tonic::Status> {
     if req.name.is_empty() {
-        return Err(tonic::Status::invalid_argument("Rule name must not be empty"));
+        return Err(tonic::Status::invalid_argument(
+            "Rule name must not be empty",
+        ));
     }
 
     let criteria: RuleCriteria = serde_json::from_str(&req.criteria_json)

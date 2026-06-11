@@ -10,7 +10,9 @@ use syswall_infra::nfqueue::{NfqueueInterceptor, OverflowPolicy};
 use syswall_app::fakes::{
     FakeConnectionMonitor, FakeFirewallEngine, FakeProcessResolver, FakeUserNotifier,
 };
-use syswall_app::services::antilockout_guard::{AntilockoutConfig as GuardConfig, AntilockoutGuard};
+use syswall_app::services::antilockout_guard::{
+    AntilockoutConfig as GuardConfig, AntilockoutGuard,
+};
 use syswall_app::services::audit_service::AuditService;
 use syswall_app::services::connection_service::ConnectionService;
 use syswall_app::services::learning_service::{
@@ -19,17 +21,17 @@ use syswall_app::services::learning_service::{
 use syswall_app::services::rule_service::RuleService;
 use syswall_domain::ports::connectivity::LockoutGuard;
 use syswall_domain::ports::{ConnectionMonitor, FirewallEngine, ProcessResolver};
-use syswall_infra::conntrack::{ConntrackConfig, ConntrackMonitorAdapter};
+use syswall_ebpf::{EbpfProcessResolver, HybridProcessResolver};
 use syswall_infra::connectivity::TcpProbe;
+use syswall_infra::conntrack::{ConntrackConfig, ConntrackMonitorAdapter};
 use syswall_infra::dns::DnsResolver as InfraDnsResolver;
 use syswall_infra::event_bus::TokioBroadcastEventBus;
 use syswall_infra::nftables::{NftablesConfig, NftablesFirewallAdapter};
+use syswall_infra::persistence::Database;
 use syswall_infra::persistence::audit_repository::SqliteAuditRepository;
 use syswall_infra::persistence::decision_repository::SqliteDecisionRepository;
 use syswall_infra::persistence::pending_decision_repository::SqlitePendingDecisionRepository;
 use syswall_infra::persistence::rule_repository::SqliteRuleRepository;
-use syswall_infra::persistence::Database;
-use syswall_ebpf::{EbpfProcessResolver, HybridProcessResolver};
 use syswall_infra::process::{ProcfsConfig, ProcfsProcessResolver};
 
 use crate::config::SysWallConfig;
@@ -99,10 +101,7 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
 
         // Injection du guard anti-lockout dans l'adaptateur nftables
         // Inject the anti-lockout guard into the nftables adapter
-        let al_cfg = config
-            .antilockout
-            .clone()
-            .unwrap_or_default();
+        let al_cfg = config.antilockout.clone().unwrap_or_default();
 
         let nft_adapter = if al_cfg.enabled {
             let endpoints: Result<Vec<SocketAddr>, _> = al_cfg
@@ -114,8 +113,11 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
                 StartupError::ConfigInvalid(format!("antilockout.endpoints parse error: {e}"))
             })?;
             let probe = Arc::new(
-                TcpProbe::new(endpoints, Duration::from_secs(al_cfg.per_endpoint_timeout_secs))
-                    .map_err(|e| StartupError::ConfigInvalid(format!("antilockout: {e}")))?,
+                TcpProbe::new(
+                    endpoints,
+                    Duration::from_secs(al_cfg.per_endpoint_timeout_secs),
+                )
+                .map_err(|e| StartupError::ConfigInvalid(format!("antilockout: {e}")))?,
             );
             let guard = Arc::new(AntilockoutGuard::new(
                 probe,
@@ -174,10 +176,7 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
             None
         };
 
-        info!(
-            "Using HybridProcessResolver (ebpf={})",
-            ebpf.is_some()
-        );
+        info!("Using HybridProcessResolver (ebpf={})", ebpf.is_some());
         Arc::new(HybridProcessResolver::new(ebpf, procfs))
     };
 

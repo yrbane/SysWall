@@ -13,9 +13,11 @@ async fn nfqueue_open_and_close() {
     // Vrai test fumée : ouvrir une queue, faire bind, set_queue_max_len, fermer.
     // Real smoke test: open a queue, bind, set max len, close.
     use std::sync::Arc;
-    use tokio_util::sync::CancellationToken;
-    use syswall_domain::ports::interception::{PacketDecisionHandler, PacketInterceptor, PacketVerdict};
+    use syswall_domain::ports::interception::{
+        PacketDecisionHandler, PacketInterceptor, PacketVerdict,
+    };
     use syswall_infra::nfqueue::{NfqueueInterceptor, OverflowPolicy};
+    use tokio_util::sync::CancellationToken;
 
     struct Reject;
     #[async_trait::async_trait]

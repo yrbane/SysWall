@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tonic::{service::Interceptor, Request, Status};
+use tonic::{Request, Status, service::Interceptor};
 
 use syswall_domain::entities::{AuditEvent, EventCategory, Severity};
 
@@ -24,7 +24,10 @@ pub struct PeerAuthPolicy {
 
 impl PeerAuthPolicy {
     pub fn new(allowed_uids: HashSet<u32>, allowed_gids: HashSet<u32>) -> Self {
-        Self { allowed_uids, allowed_gids }
+        Self {
+            allowed_uids,
+            allowed_gids,
+        }
     }
 
     pub fn permits(&self, creds: &PeerCredentials) -> bool {
@@ -59,12 +62,17 @@ impl Interceptor for PeerAuthInterceptor {
             let event = AuditEvent::new(
                 Severity::Warning,
                 EventCategory::Authentication,
-                format!("gRPC denied: uid={} gid={} pid={}", creds.uid, creds.gid, creds.pid),
+                format!(
+                    "gRPC denied: uid={} gid={} pid={}",
+                    creds.uid, creds.gid, creds.pid
+                ),
             )
             .with_metadata("uid", creds.uid.to_string())
             .with_metadata("gid", creds.gid.to_string())
             .with_metadata("pid", creds.pid.to_string());
-            if let Err(tokio::sync::mpsc::error::TrySendError::Full(_)) = self.audit_tx.try_send(event) {
+            if let Err(tokio::sync::mpsc::error::TrySendError::Full(_)) =
+                self.audit_tx.try_send(event)
+            {
                 tracing::warn!(target: "auth", "audit channel full, denial event dropped");
             }
             Err(Status::permission_denied(
@@ -96,7 +104,11 @@ mod tests {
             HashSet::from([1234]),
         ));
         let mut intercept = PeerAuthInterceptor::new(policy, tx);
-        let req = make(PeerCredentials { uid: 0, gid: 100, pid: 9 });
+        let req = make(PeerCredentials {
+            uid: 0,
+            gid: 100,
+            pid: 9,
+        });
         assert!(intercept.call(req).is_ok());
     }
 
@@ -108,7 +120,11 @@ mod tests {
             HashSet::from([1234]),
         ));
         let mut intercept = PeerAuthInterceptor::new(policy, tx);
-        let req = make(PeerCredentials { uid: 1000, gid: 1234, pid: 9 });
+        let req = make(PeerCredentials {
+            uid: 1000,
+            gid: 1234,
+            pid: 9,
+        });
         assert!(intercept.call(req).is_ok());
     }
 
@@ -120,7 +136,11 @@ mod tests {
             HashSet::from([1234]),
         ));
         let mut intercept = PeerAuthInterceptor::new(policy, tx);
-        let req = make(PeerCredentials { uid: 1000, gid: 1000, pid: 9 });
+        let req = make(PeerCredentials {
+            uid: 1000,
+            gid: 1000,
+            pid: 9,
+        });
         let err = intercept.call(req).unwrap_err();
         assert_eq!(err.code(), tonic::Code::PermissionDenied);
         let event = rx.try_recv().expect("audit event emitted on denial");

@@ -2,13 +2,13 @@
 /// Service de streaming d'événements gRPC implémentant le trait SysWallEvents.
 use std::sync::Arc;
 
-use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
+use tokio_stream::wrappers::BroadcastStream;
 use tonic::{Request, Response, Status};
 use tracing::warn;
 
-use syswall_infra::event_bus::TokioBroadcastEventBus;
 use syswall_domain::ports::EventBus;
+use syswall_infra::event_bus::TokioBroadcastEventBus;
 use syswall_proto::syswall::sys_wall_events_server::SysWallEvents;
 use syswall_proto::syswall::{DomainEventMessage, SubscribeRequest};
 
@@ -30,8 +30,9 @@ impl SysWallEventService {
 
 #[tonic::async_trait]
 impl SysWallEvents for SysWallEventService {
-    type SubscribeEventsStream =
-        std::pin::Pin<Box<dyn tokio_stream::Stream<Item = Result<DomainEventMessage, Status>> + Send + 'static>>;
+    type SubscribeEventsStream = std::pin::Pin<
+        Box<dyn tokio_stream::Stream<Item = Result<DomainEventMessage, Status>> + Send + 'static>,
+    >;
 
     async fn subscribe_events(
         &self,

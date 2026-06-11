@@ -1,13 +1,3 @@
-#![cfg_attr(not(test), deny(clippy::unwrap_used))]
-
-mod bootstrap;
-mod config;
-mod grpc;
-mod signals;
-mod startup_error;
-mod supervisor;
-mod watchdog;
-
 use std::path::Path;
 use std::time::Duration;
 
@@ -19,10 +9,11 @@ use syswall_app::services::audit_service::{AuditService, BufferedAuditWriter};
 use syswall_domain::entities::ConnectionVerdict;
 use syswall_domain::ports::{EventBus, RuleRepository};
 
-use crate::config::SysWallConfig;
-use crate::grpc::{SysWallControlService, SysWallEventService, start_grpc_server};
-use crate::startup_error::StartupError;
-use crate::supervisor::Supervisor;
+use syswall_daemon::config::SysWallConfig;
+use syswall_daemon::grpc::{SysWallControlService, SysWallEventService, start_grpc_server};
+use syswall_daemon::startup_error::StartupError;
+use syswall_daemon::supervisor::Supervisor;
+use syswall_daemon::{bootstrap, signals, watchdog};
 
 use syswall_domain::entities::AuditEvent as DomainAuditEvent;
 
@@ -51,8 +42,8 @@ async fn run() -> Result<(), StartupError> {
     info!("SysWall daemon starting...");
 
     // Charge la config depuis SYSWALL_CONFIG ou le chemin par défaut
-    let config_path = std::env::var("SYSWALL_CONFIG")
-        .unwrap_or_else(|_| "config/default.toml".to_string());
+    let config_path =
+        std::env::var("SYSWALL_CONFIG").unwrap_or_else(|_| "config/default.toml".to_string());
 
     let config = SysWallConfig::load(Path::new(&config_path))
         .map_err(|e| StartupError::ConfigInvalid(e.to_string()))?;
@@ -173,9 +164,16 @@ async fn run() -> Result<(), StartupError> {
         let audit_tx = grpc_audit_tx.clone();
 
         async move {
-            start_grpc_server(socket_path, control_service, event_service, syswall_gid, audit_tx, cancel)
-                .await
-                .map_err(|e| e.to_string())
+            start_grpc_server(
+                socket_path,
+                control_service,
+                event_service,
+                syswall_gid,
+                audit_tx,
+                cancel,
+            )
+            .await
+            .map_err(|e| e.to_string())
         }
     });
 

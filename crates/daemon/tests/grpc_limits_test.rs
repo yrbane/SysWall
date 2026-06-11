@@ -29,10 +29,10 @@ use syswall_proto::syswall::sys_wall_control_server::{SysWallControl, SysWallCon
 use syswall_proto::syswall::sys_wall_events_server::{SysWallEvents, SysWallEventsServer};
 use syswall_proto::syswall::{
     AuditLogRequest, AuditLogResponse, CreateRuleRequest, DashboardStatsRequest,
-    DashboardStatsResponse, DecisionAck, DecisionResponseRequest, Empty, ExportAuditLogRequest,
-    ExportAuditLogResponse, PendingDecisionListResponse, RuleFiltersRequest, RuleIdRequest,
-    RuleListResponse, RuleResponse, SetNetworkEnabledRequest, StatusResponse, SubscribeRequest,
-    ToggleRuleRequest, DomainEventMessage,
+    DashboardStatsResponse, DecisionAck, DecisionResponseRequest, DomainEventMessage, Empty,
+    ExportAuditLogRequest, ExportAuditLogResponse, PendingDecisionListResponse, RuleFiltersRequest,
+    RuleIdRequest, RuleListResponse, RuleResponse, SetNetworkEnabledRequest, StatusResponse,
+    SubscribeRequest, ToggleRuleRequest,
 };
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,11 @@ struct StubEventService;
 #[tonic::async_trait]
 impl SysWallEvents for StubEventService {
     type SubscribeEventsStream = std::pin::Pin<
-        Box<dyn tokio_stream::Stream<Item = Result<DomainEventMessage, tonic::Status>> + Send + 'static>,
+        Box<
+            dyn tokio_stream::Stream<Item = Result<DomainEventMessage, tonic::Status>>
+                + Send
+                + 'static,
+        >,
     >;
 
     async fn subscribe_events(
@@ -325,7 +329,11 @@ async fn small_message_is_accepted() {
     let result = client.create_rule(req).await;
     cancel.cancel();
 
-    assert!(result.is_ok(), "Un petit message doit être accepté : {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Un petit message doit être accepté : {:?}",
+        result.err()
+    );
 }
 
 #[tokio::test]

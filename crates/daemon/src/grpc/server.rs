@@ -16,8 +16,8 @@ use tokio_stream::StreamExt;
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::sync::CancellationToken;
 use tonic::service::interceptor::InterceptedService;
-use tonic::transport::server::Connected;
 use tonic::transport::Server;
+use tonic::transport::server::Connected;
 use tracing::info;
 
 use syswall_domain::entities::AuditEvent;
@@ -53,7 +53,10 @@ impl PeerStream {
             gid: raw.gid(),
             pid: raw.pid(),
         };
-        Ok(PeerStream { inner: stream, creds })
+        Ok(PeerStream {
+            inner: stream,
+            creds,
+        })
     }
 }
 
@@ -86,17 +89,11 @@ impl AsyncWrite for PeerStream {
         Pin::new(&mut self.inner).poll_write(cx, buf)
     }
 
-    fn poll_flush(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<std::io::Result<()>> {
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         Pin::new(&mut self.inner).poll_flush(cx)
     }
 
-    fn poll_shutdown(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<std::io::Result<()>> {
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }
@@ -118,34 +115,40 @@ pub async fn start_grpc_server(
 ) -> Result<(), StartupError> {
     // Supprime l'ancien fichier socket s'il existe
     if socket_path.exists() {
-        std::fs::remove_file(&socket_path).map_err(|e| StartupError::InfrastructureInit(
-            format!("impossible de supprimer l'ancien socket: {e}"),
-        ))?;
+        std::fs::remove_file(&socket_path).map_err(|e| {
+            StartupError::InfrastructureInit(format!(
+                "impossible de supprimer l'ancien socket: {e}"
+            ))
+        })?;
     }
 
     // Crée le répertoire parent si nécessaire
     if let Some(parent) = socket_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| StartupError::InfrastructureInit(
-            format!("impossible de créer le répertoire du socket: {e}"),
-        ))?;
+        std::fs::create_dir_all(parent).map_err(|e| {
+            StartupError::InfrastructureInit(format!(
+                "impossible de créer le répertoire du socket: {e}"
+            ))
+        })?;
     }
 
     // Bind du socket Unix — erreur fatale si impossible
-    let listener = UnixListener::bind(&socket_path).map_err(|e| StartupError::SocketBindFailed {
-        path: socket_path.display().to_string(),
-        source: e,
-    })?;
+    let listener =
+        UnixListener::bind(&socket_path).map_err(|e| StartupError::SocketBindFailed {
+            path: socket_path.display().to_string(),
+            source: e,
+        })?;
 
     info!("Serveur gRPC en écoute sur {:?}", socket_path);
 
     // Permissions 0660 : propriétaire + groupe en lecture/écriture
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&socket_path, std::fs::Permissions::from_mode(0o660))
-            .map_err(|e| StartupError::SocketChownFailed {
+        std::fs::set_permissions(&socket_path, std::fs::Permissions::from_mode(0o660)).map_err(
+            |e| StartupError::SocketChownFailed {
                 path: socket_path.display().to_string(),
                 source: e,
-            })?;
+            },
+        )?;
     }
 
     // Chown vers le groupe syswall — erreur fatale
@@ -167,9 +170,8 @@ pub async fn start_grpc_server(
     let peer_auth = PeerAuthInterceptor::new(policy, audit_tx);
 
     // Flux de connexions : chaque UnixStream accepté devient un PeerStream
-    let incoming = UnixListenerStream::new(listener).map(|res| {
-        res.and_then(PeerStream::from_unix_stream)
-    });
+    let incoming =
+        UnixListenerStream::new(listener).map(|res| res.and_then(PeerStream::from_unix_stream));
 
     // Limites par service : 1 Mio décodage, 4 Mio encodage
     // Per-service limits: 1 MiB decode, 4 MiB encode
