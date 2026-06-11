@@ -1,0 +1,58 @@
+config_version = 1
+
+[daemon]
+socket_path = "/var/run/syswall/syswall.sock"
+log_level = "info"
+watchdog_interval_secs = 15
+
+[database]
+path = "/var/lib/syswall/syswall.db"
+journal_retention_days = 30
+audit_batch_size = 100
+audit_flush_interval_secs = 2
+
+[firewall]
+default_policy = "ask"
+rollback_timeout_secs = 30
+nftables_table_name = "syswall"
+nft_binary_path = "/usr/sbin/nft"
+nft_command_timeout_secs = 5
+nft_max_output_bytes = 1048576
+use_fake = false
+
+[monitoring]
+conntrack_buffer_size = 4096
+process_cache_ttl_secs = 5
+process_cache_capacity = 1024
+event_bus_capacity = 4096
+conntrack_binary_path = "/usr/sbin/conntrack"
+conntrack_protocols = ["tcp", "udp"]
+use_fake = false
+event_merge_window_ms = 100
+
+[learning]
+enabled = true
+debounce_window_secs = 5
+prompt_timeout_secs = 60
+default_timeout_action = "block"
+max_pending_decisions = 50
+overflow_action = "block"
+
+[ebpf]
+enabled = true
+
+[ui]
+locale = "fr"
+
+[antilockout]
+enabled = true
+endpoints = ["1.1.1.1:53", "[2606:4700:4700::1111]:53"]
+timeout_secs = 30
+probe_interval_secs = 5
+per_endpoint_timeout_secs = 2
+
+[nfqueue]
+enabled = true
+queue_num = 0
+max_queued = 1024
+overflow_policy = "block"

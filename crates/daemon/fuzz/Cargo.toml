@@ -1,0 +1,33 @@
+[package]
+name = "syswall-daemon-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+syswall-daemon = { path = ".." }
+syswall-proto = { path = "../../proto" }
+
+[[bin]]
+name = "fuzz_config_toml"
+path = "fuzz_targets/fuzz_config_toml.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_create_rule_cmd"
+path = "fuzz_targets/fuzz_create_rule_cmd.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1
+
+[workspace]
