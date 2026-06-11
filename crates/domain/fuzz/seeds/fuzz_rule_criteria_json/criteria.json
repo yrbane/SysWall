@@ -1,0 +1,1 @@
+{"application":{"ByName":"firefox"},"user":null,"remote_ip":{"Cidr":{"network":"10.0.0.0","prefix_len":8}},"remote_port":{"Exact":443},"local_port":null,"protocol":"Tcp","direction":"Outbound","schedule":null}

@@ -11,6 +11,8 @@ members = [
 ]
 exclude = [
     "crates/ebpf-prog",
+    "crates/domain/fuzz",
+    "crates/daemon/fuzz",
 ]
 
 [workspace.package]

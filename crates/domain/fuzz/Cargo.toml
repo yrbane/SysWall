@@ -1,0 +1,27 @@
+[package]
+name = "syswall-domain-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+# Exclure ce crate du workspace racine — cargo-fuzz gère son propre contexte de build.
+# Exclude this crate from the root workspace — cargo-fuzz manages its own build context.
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+syswall-domain = { path = ".." }
+
+[[bin]]
+name = "fuzz_rule_criteria_json"
+path = "fuzz_targets/fuzz_rule_criteria_json.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1
