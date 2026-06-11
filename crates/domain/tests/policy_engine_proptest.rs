@@ -173,6 +173,62 @@ fn arb_rule() -> impl Strategy<Value = Rule> {
         })
 }
 
+/// Règle décisive (Allow/Block) toujours active : l'ordre de matching est observable.
+/// Decisive rule (Allow/Block), always enabled: matching order is observable.
+fn arb_decisive_rule() -> impl Strategy<Value = Rule> {
+    (
+        0u32..1000,
+        arb_criteria(),
+        prop_oneof![Just(RuleEffect::Allow), Just(RuleEffect::Block)],
+    )
+        .prop_map(|(priority, criteria, effect)| Rule {
+            id: RuleId::new(),
+            name: "decisive rule".to_string(),
+            priority: RulePriority::new(priority),
+            enabled: true,
+            criteria,
+            effect,
+            scope: RuleScope::Permanent,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            source: RuleSource::Manual,
+        })
+}
+
+// --- Helpers ---
+
+/// Connexion sortante fixe vers l'IP donnée (port 443).
+/// Fixed outbound connection to the given IP (port 443).
+fn connection_to(ip: IpAddr) -> Connection {
+    Connection {
+        id: ConnectionId::from_uuid(uuid::Uuid::nil()),
+        protocol: Protocol::Tcp,
+        source: SocketAddress::new(
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10)),
+            Port::new(45000).expect("port non nul"),
+        ),
+        destination: SocketAddress::new(ip, Port::new(443).expect("port non nul")),
+        direction: Direction::Outbound,
+        state: ConnectionState::New,
+        process: None,
+        user: None,
+        bytes_sent: 0,
+        bytes_received: 0,
+        started_at: chrono::DateTime::from_timestamp(0, 0).expect("epoch valide"),
+        verdict: ConnectionVerdict::Unknown,
+        matched_rule: None,
+        remote_hostname: None,
+    }
+}
+
+/// Connexion sortante fixe vers le port distant donné.
+/// Fixed outbound connection to the given remote port.
+fn connection_to_port(port: u16) -> Connection {
+    let mut conn = connection_to(IpAddr::V4(Ipv4Addr::new(93, 184, 216, 34)));
+    conn.destination.port = Port::new(port).expect("port non nul");
+    conn
+}
+
 // --- Propriétés / Properties ---
 
 proptest! {
@@ -219,5 +275,83 @@ proptest! {
             prop_assert!(!rule.is_expired());
             prop_assert!(PolicyEngine::matches(&rule.criteria, &conn));
         }
+    }
+
+    /// La première règle décisive (triée par priorité) qui matche gagne.
+    /// The first matching decisive rule (sorted by priority) wins.
+    #[test]
+    fn first_matching_decisive_rule_wins(
+        conn in arb_connection(),
+        mut rules in proptest::collection::vec(arb_decisive_rule(), 0..20),
+    ) {
+        rules.sort_by_key(|r| r.priority);
+        let expected = rules
+            .iter()
+            .find(|r| PolicyEngine::matches(&r.criteria, &conn))
+            .map(|r| r.id);
+        let eval = PolicyEngine::evaluate(&conn, &rules, DefaultPolicy::Block);
+        prop_assert_eq!(eval.matched_rule_id, expected);
+    }
+
+    /// Un matcher IP d'une famille ne matche jamais une IP de l'autre famille.
+    /// An IP matcher of one family never matches an IP of the other family.
+    #[test]
+    fn ip_family_mismatch_never_matches(v4 in any::<[u8; 4]>(), v6 in any::<[u8; 16]>()) {
+        let matcher_v4 = IpMatcher::Exact(IpAddr::V4(Ipv4Addr::from(v4)));
+        let criteria_v4 = RuleCriteria {
+            remote_ip: Some(matcher_v4),
+            application: None,
+            user: None,
+            remote_port: None,
+            local_port: None,
+            protocol: None,
+            direction: None,
+            schedule: None,
+        };
+        prop_assert!(!PolicyEngine::matches(
+            &criteria_v4,
+            &connection_to(IpAddr::V6(Ipv6Addr::from(v6))),
+        ));
+        let matcher_v6 = IpMatcher::Cidr {
+            network: IpAddr::V6(Ipv6Addr::from(v6)),
+            prefix_len: 64,
+        };
+        let criteria_v6 = RuleCriteria {
+            remote_ip: Some(matcher_v6),
+            application: None,
+            user: None,
+            remote_port: None,
+            local_port: None,
+            protocol: None,
+            direction: None,
+            schedule: None,
+        };
+        prop_assert!(!PolicyEngine::matches(
+            &criteria_v6,
+            &connection_to(IpAddr::V4(Ipv4Addr::from(v4))),
+        ));
+    }
+
+    /// Les bornes d'un PortMatcher::Range sont inclusives.
+    /// PortMatcher::Range bounds are inclusive.
+    #[test]
+    fn port_range_bounds_inclusive(start in 1u16..=u16::MAX, end in 1u16..=u16::MAX) {
+        let (lo, hi) = if start <= end { (start, end) } else { (end, start) };
+        let matcher = PortMatcher::Range {
+            start: Port::new(lo).expect("port non nul"),
+            end: Port::new(hi).expect("port non nul"),
+        };
+        let criteria = RuleCriteria {
+            remote_port: Some(matcher),
+            application: None,
+            user: None,
+            remote_ip: None,
+            local_port: None,
+            protocol: None,
+            direction: None,
+            schedule: None,
+        };
+        prop_assert!(PolicyEngine::matches(&criteria, &connection_to_port(lo)));
+        prop_assert!(PolicyEngine::matches(&criteria, &connection_to_port(hi)));
     }
 }
