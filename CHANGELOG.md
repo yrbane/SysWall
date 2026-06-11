@@ -15,6 +15,9 @@ Version de stabilisation post-V0.2 : finition technique, hardening CI, polish.
 - **Real gRPC test harness** : `crates/daemon/tests/grpc_limits_test.rs` n'est plus un squelette. `message_over_1mib_is_rejected` envoie 2 MiB et verifie `OutOfRange` ; `small_message_is_accepted` valide le happy path. `concurrency_limit_is_enforced` reste TODO V0.4.
 - **`cargo deny` en CI** : nouveau `deny.toml` (whitelist licenses MIT/Apache-2/BSD/ISC/Zlib/MPL-2/Unicode-3.0/CC0/0BSD), 17 RUSTSEC ignorees ligne par ligne pour les unmaintained transitives Tauri/GTK/wry. Job `deny` dans CI via `EmbarkStudios/cargo-deny-action@v2`.
 - **Jobs CI dedie** : `grpc-integration` (env `SYSWALL_TEST_GRPC=1`, sans privileges) et `nfqueue-smoke` (sudo + modprobe nfnetlink_queue, `continue-on-error: true` car le runner peut ne pas avoir CAP_NET_ADMIN).
+- **Property tests PolicyEngine** : 6 invariants verifies par proptest (politique par defaut, no-panic, coherence de la regle matchee, first-match-wins, isolation des familles IP, bornes de ports inclusives) dans `crates/domain/tests/policy_engine_proptest.rs`.
+- **Fuzzing cargo-fuzz** : 3 cibles libFuzzer sur les surfaces d'entree non fiables — JSON criteria/scope/rule (`crates/domain/fuzz`), config TOML et converter gRPC `CreateRuleRequest` avec entrees Arbitrary biaisees (`crates/daemon/fuzz`). Job CI `fuzz-smoke` (60 s/cible, nightly).
+- **Lib daemon** : `crates/daemon/src/lib.rs` expose `config` et `grpc` pour les tests d'integration et le fuzzing (le binaire reste inchange).
 
 ### Changed / Modifie
 

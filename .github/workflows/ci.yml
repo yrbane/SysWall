@@ -101,3 +101,22 @@ jobs:
       - name: Run NFQUEUE smoke test
         run: sudo -E env "PATH=$PATH" SYSWALL_TEST_NFQUEUE=1 cargo test -p syswall-daemon --test nfqueue_smoke_test -- --nocapture
         continue-on-error: true  # CI runner may not have CAP_NET_ADMIN; report but don't block
+
+  fuzz-smoke:
+    name: Fuzz smoke (60s par cible / per target)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: Fuzz domain (criteria/scope/rule JSON)
+        working-directory: crates/domain
+        run: cargo +nightly fuzz run fuzz_rule_criteria_json fuzz/seeds/fuzz_rule_criteria_json -- -max_total_time=60
+      - name: Fuzz daemon (config TOML)
+        working-directory: crates/daemon
+        run: cargo +nightly fuzz run fuzz_config_toml fuzz/seeds/fuzz_config_toml -- -max_total_time=60
+      - name: Fuzz daemon (CreateRuleRequest)
+        working-directory: crates/daemon
+        run: cargo +nightly fuzz run fuzz_create_rule_cmd -- -max_total_time=60
