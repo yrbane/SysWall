@@ -25,10 +25,7 @@ pub fn parse_nft_table_rules(json: &str) -> Result<Vec<NftRuleEntry>, DomainErro
                 .unwrap_or("")
                 .to_string();
 
-            let handle = rule_obj
-                .get("handle")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0);
+            let handle = rule_obj.get("handle").and_then(|v| v.as_u64()).unwrap_or(0);
 
             let comment = rule_obj
                 .get("comment")
@@ -131,8 +128,7 @@ mod tests {
 
     #[test]
     fn extract_uuid_from_valid_comment() {
-        let uuid =
-            extract_rule_id_from_comment("syswall:550e8400-e29b-41d4-a716-446655440000");
+        let uuid = extract_rule_id_from_comment("syswall:550e8400-e29b-41d4-a716-446655440000");
         assert!(uuid.is_some());
         assert_eq!(
             uuid.unwrap().to_string(),
@@ -161,7 +157,8 @@ mod tests {
 
     #[test]
     fn table_exists_returns_false_for_different_table() {
-        let json = r#"{"nftables": [{"table": {"family": "inet", "name": "filter", "handle": 1}}]}"#;
+        let json =
+            r#"{"nftables": [{"table": {"family": "inet", "name": "filter", "handle": 1}}]}"#;
         assert!(!table_exists_in_json(json, "syswall"));
     }
 
@@ -183,7 +180,9 @@ mod tests {
     #[test]
     fn extract_uuid_from_comment_with_extra_whitespace() {
         // The comment should be exact, no whitespace tolerance
-        assert!(extract_rule_id_from_comment(" syswall:550e8400-e29b-41d4-a716-446655440000").is_none());
+        assert!(
+            extract_rule_id_from_comment(" syswall:550e8400-e29b-41d4-a716-446655440000").is_none()
+        );
     }
 
     #[test]

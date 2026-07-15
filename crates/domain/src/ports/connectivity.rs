@@ -65,7 +65,10 @@ mod tests {
     #[test]
     fn probe_error_displays_configuration() {
         let err = ProbeError::Configuration("empty endpoints".into());
-        assert_eq!(err.to_string(), "Probe configuration error: empty endpoints");
+        assert_eq!(
+            err.to_string(),
+            "Probe configuration error: empty endpoints"
+        );
     }
 
     #[test]

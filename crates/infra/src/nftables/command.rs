@@ -70,11 +70,7 @@ impl NftCommandBuilder {
     /// Create the table if it does not exist.
     /// Cree la table si elle n'existe pas.
     pub fn create_table(table: &str) -> Self {
-        Self::new()
-            .arg("add")
-            .arg("table")
-            .arg("inet")
-            .arg(table)
+        Self::new().arg("add").arg("table").arg("inet").arg(table)
     }
 
     /// Create a chain with the given hook and priority.
@@ -145,19 +141,13 @@ mod tests {
     #[test]
     fn list_table_produces_correct_args() {
         let cmd = NftCommandBuilder::list_table("syswall");
-        assert_eq!(
-            cmd.args(),
-            &["-j", "list", "table", "inet", "syswall"]
-        );
+        assert_eq!(cmd.args(), &["-j", "list", "table", "inet", "syswall"]);
     }
 
     #[test]
     fn add_rule_produces_correct_base_args() {
         let cmd = NftCommandBuilder::add_rule("syswall", "output");
-        assert_eq!(
-            cmd.args(),
-            &["add", "rule", "inet", "syswall", "output"]
-        );
+        assert_eq!(cmd.args(), &["add", "rule", "inet", "syswall", "output"]);
     }
 
     #[test]
@@ -189,10 +179,7 @@ mod tests {
     #[test]
     fn create_table_produces_correct_args() {
         let cmd = NftCommandBuilder::create_table("syswall");
-        assert_eq!(
-            cmd.args(),
-            &["add", "table", "inet", "syswall"]
-        );
+        assert_eq!(cmd.args(), &["add", "table", "inet", "syswall"]);
     }
 
     #[test]
@@ -201,7 +188,11 @@ mod tests {
         assert_eq!(
             cmd.args(),
             &[
-                "add", "chain", "inet", "syswall", "input",
+                "add",
+                "chain",
+                "inet",
+                "syswall",
+                "input",
                 "{ type filter hook input priority 0; policy accept; }"
             ]
         );
@@ -210,27 +201,18 @@ mod tests {
     #[test]
     fn list_ruleset_json_produces_correct_args() {
         let cmd = NftCommandBuilder::list_ruleset_json();
-        assert_eq!(
-            cmd.args(),
-            &["-j", "list", "ruleset"]
-        );
+        assert_eq!(cmd.args(), &["-j", "list", "ruleset"]);
     }
 
     #[test]
     fn arg_chaining_preserves_order() {
-        let cmd = NftCommandBuilder::new()
-            .arg("one")
-            .arg("two")
-            .arg("three");
+        let cmd = NftCommandBuilder::new().arg("one").arg("two").arg("three");
         assert_eq!(cmd.args(), &["one", "two", "three"]);
     }
 
     #[test]
     fn with_limits_sets_custom_values() {
-        let cmd = NftCommandBuilder::with_limits(
-            Duration::from_secs(10),
-            2_097_152,
-        );
+        let cmd = NftCommandBuilder::with_limits(Duration::from_secs(10), 2_097_152);
         assert_eq!(cmd.timeout(), Duration::from_secs(10));
         assert_eq!(cmd.max_output_bytes(), 2_097_152);
     }
@@ -249,7 +231,11 @@ mod tests {
         assert_eq!(
             cmd.args(),
             &[
-                "add", "chain", "inet", "syswall", "prerouting",
+                "add",
+                "chain",
+                "inet",
+                "syswall",
+                "prerouting",
                 "{ type filter hook prerouting priority -100; policy accept; }"
             ]
         );
@@ -264,9 +250,6 @@ mod tests {
     #[test]
     fn add_rule_different_table() {
         let cmd = NftCommandBuilder::add_rule("mytable", "mychain");
-        assert_eq!(
-            cmd.args(),
-            &["add", "rule", "inet", "mytable", "mychain"]
-        );
+        assert_eq!(cmd.args(), &["add", "rule", "inet", "mytable", "mychain"]);
     }
 }

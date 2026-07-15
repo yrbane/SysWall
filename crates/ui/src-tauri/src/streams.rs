@@ -41,10 +41,7 @@ pub struct EventPayload {
 }
 
 /// Subscribe to the daemon event stream and forward events to the Tauri frontend.
-pub async fn subscribe_and_forward(
-    app_handle: AppHandle,
-    client: Arc<Mutex<Option<GrpcClient>>>,
-) {
+pub async fn subscribe_and_forward(app_handle: AppHandle, client: Arc<Mutex<Option<GrpcClient>>>) {
     loop {
         let events_client = {
             let guard = client.lock().await;

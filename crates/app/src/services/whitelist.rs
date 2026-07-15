@@ -104,7 +104,9 @@ pub async fn ensure_system_whitelist(
             "Allow Loopback (IPv6)",
             RuleCriteria {
                 remote_ip: Some(IpMatcher::Exact(
-                    "::1".parse().expect("::1 est l'adresse de loopback IPv6 litterale valide"),
+                    "::1"
+                        .parse()
+                        .expect("::1 est l'adresse de loopback IPv6 litterale valide"),
                 )),
                 ..Default::default()
             },
@@ -180,8 +182,7 @@ mod tests {
         let rule_repo = Arc::new(FakeRuleRepository::new());
         let firewall = Arc::new(FakeFirewallEngine::new());
         let event_bus = Arc::new(FakeEventBus::new());
-        let rule_service =
-            RuleService::new(rule_repo.clone(), firewall.clone(), event_bus.clone());
+        let rule_service = RuleService::new(rule_repo.clone(), firewall.clone(), event_bus.clone());
 
         // Create whitelist first time
         ensure_system_whitelist(&rule_service, rule_repo.as_ref())

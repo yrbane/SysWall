@@ -1,10 +1,10 @@
+use chrono::Utc;
 /// Benchmarks du PolicyEngine avec Criterion.
 /// Mesure le temps d'évaluation d'une connexion contre N règles.
 ///
 /// PolicyEngine benchmarks with Criterion.
 /// Measures connection evaluation time against N rules.
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use chrono::Utc;
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use syswall_domain::entities::*;
 use syswall_domain::events::DefaultPolicy;
 use syswall_domain::services::PolicyEngine;
@@ -14,14 +14,8 @@ fn make_connection() -> Connection {
     Connection {
         id: ConnectionId::new(),
         protocol: Protocol::Tcp,
-        source: SocketAddress::new(
-            "192.168.1.100".parse().unwrap(),
-            Port::new(45000).unwrap(),
-        ),
-        destination: SocketAddress::new(
-            "93.184.216.34".parse().unwrap(),
-            Port::new(443).unwrap(),
-        ),
+        source: SocketAddress::new("192.168.1.100".parse().unwrap(), Port::new(45000).unwrap()),
+        destination: SocketAddress::new("93.184.216.34".parse().unwrap(), Port::new(443).unwrap()),
         direction: Direction::Outbound,
         state: ConnectionState::New,
         process: Some(ProcessInfo {
@@ -77,19 +71,11 @@ fn policy_engine_benchmark(c: &mut Criterion) {
 
     for rule_count in [10, 100, 500, 1000] {
         let rules = make_rules(rule_count);
-        group.bench_with_input(
-            BenchmarkId::new("rules", rule_count),
-            &rules,
-            |b, rules| {
-                b.iter(|| {
-                    PolicyEngine::evaluate(
-                        black_box(&conn),
-                        black_box(rules),
-                        DefaultPolicy::Block,
-                    )
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("rules", rule_count), &rules, |b, rules| {
+            b.iter(|| {
+                PolicyEngine::evaluate(black_box(&conn), black_box(rules), DefaultPolicy::Block)
+            });
+        });
     }
 
     group.finish();

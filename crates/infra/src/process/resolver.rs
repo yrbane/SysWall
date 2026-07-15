@@ -12,7 +12,10 @@ use syswall_domain::value_objects::ExecutablePath;
 use syswall_domain::value_objects::Protocol;
 
 use super::cache::ProcessCache;
-use super::proc_parser::{parse_cmdline_opt, parse_proc_net_tcp, parse_proc_net_tcp6, parse_proc_net_udp, parse_proc_status};
+use super::proc_parser::{
+    parse_cmdline_opt, parse_proc_net_tcp, parse_proc_net_tcp6, parse_proc_net_udp,
+    parse_proc_status,
+};
 
 /// Configuration for the ProcfsProcessResolver.
 /// Configuration pour le ProcfsProcessResolver.
@@ -208,7 +211,10 @@ impl ProcfsProcessResolver {
     fn parse_ss_pid(line: &str) -> Option<u32> {
         let pid_start = line.find("pid=")?;
         let after_pid = &line[pid_start + 4..];
-        let pid_str: String = after_pid.chars().take_while(|c| c.is_ascii_digit()).collect();
+        let pid_str: String = after_pid
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
         pid_str.parse().ok().filter(|&p| p > 0)
     }
 
@@ -320,18 +326,14 @@ impl ProcessResolver for ProcfsProcessResolver {
         // Read from /proc in a blocking task
         let result = tokio::task::spawn_blocking(move || Self::read_process_info(pid))
             .await
-            .map_err(|e| {
-                DomainError::Infrastructure(format!("spawn_blocking failed: {}", e))
-            })?;
+            .map_err(|e| DomainError::Infrastructure(format!("spawn_blocking failed: {}", e)))?;
 
         if let Some((mut info, ref user)) = result {
             // Resolve icon
-            info.icon = self.icon_resolver.resolve(
-                &info.name,
-                info.path.as_ref().map(|p| p.as_path()),
-            );
-            self.cache
-                .insert_pid(pid, info.clone(), user.clone());
+            info.icon = self
+                .icon_resolver
+                .resolve(&info.name, info.path.as_ref().map(|p| p.as_path()));
+            self.cache.insert_pid(pid, info.clone(), user.clone());
             return Ok(Some(info));
         }
 
@@ -358,12 +360,11 @@ impl ProcessResolver for ProcfsProcessResolver {
             .unwrap_or(true);
 
         if needs_refresh {
-            let new_table =
-                tokio::task::spawn_blocking(Self::refresh_socket_table)
-                    .await
-                    .map_err(|e| {
-                        DomainError::Infrastructure(format!("spawn_blocking failed: {}", e))
-                    })?;
+            let new_table = tokio::task::spawn_blocking(Self::refresh_socket_table)
+                .await
+                .map_err(|e| {
+                    DomainError::Infrastructure(format!("spawn_blocking failed: {}", e))
+                })?;
 
             if let Some(table) = new_table {
                 let count = table.len();
@@ -419,7 +420,6 @@ impl ProcessResolver for ProcfsProcessResolver {
         }
     }
 
-
     /// Resolve process info by socket inode.
     /// Resout les informations du processus par inode de socket.
     async fn resolve_by_socket(&self, inode: u64) -> Result<Option<ProcessInfo>, DomainError> {
@@ -431,9 +431,7 @@ impl ProcessResolver for ProcfsProcessResolver {
         // Find PID by scanning /proc in a blocking task
         let pid = tokio::task::spawn_blocking(move || Self::find_pid_by_inode(inode))
             .await
-            .map_err(|e| {
-                DomainError::Infrastructure(format!("spawn_blocking failed: {}", e))
-            })?;
+            .map_err(|e| DomainError::Infrastructure(format!("spawn_blocking failed: {}", e)))?;
 
         let pid = match pid {
             Some(p) => p,
@@ -446,20 +444,15 @@ impl ProcessResolver for ProcfsProcessResolver {
         // Resolve the PID
         let result = tokio::task::spawn_blocking(move || Self::read_process_info(pid))
             .await
-            .map_err(|e| {
-                DomainError::Infrastructure(format!("spawn_blocking failed: {}", e))
-            })?;
+            .map_err(|e| DomainError::Infrastructure(format!("spawn_blocking failed: {}", e)))?;
 
         if let Some((mut info, ref user)) = result {
             // Resolve icon
-            info.icon = self.icon_resolver.resolve(
-                &info.name,
-                info.path.as_ref().map(|p| p.as_path()),
-            );
-            self.cache
-                .insert_inode(inode, info.clone(), user.clone());
-            self.cache
-                .insert_pid(pid, info.clone(), user.clone());
+            info.icon = self
+                .icon_resolver
+                .resolve(&info.name, info.path.as_ref().map(|p| p.as_path()));
+            self.cache.insert_inode(inode, info.clone(), user.clone());
+            self.cache.insert_pid(pid, info.clone(), user.clone());
             return Ok(Some(info));
         }
 

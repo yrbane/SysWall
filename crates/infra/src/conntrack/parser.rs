@@ -99,10 +99,8 @@ pub fn parse_conntrack_line(line: &str) -> Option<ConntrackEvent> {
     // Second occurrence is the reply direction
     let reply_src = extract_kv_from_list(&all_kv, "src", 1).and_then(|s| s.parse::<IpAddr>().ok());
     let reply_dst = extract_kv_from_list(&all_kv, "dst", 1).and_then(|s| s.parse::<IpAddr>().ok());
-    let reply_sport =
-        extract_kv_from_list(&all_kv, "sport", 1).and_then(|s| s.parse::<u16>().ok());
-    let reply_dport =
-        extract_kv_from_list(&all_kv, "dport", 1).and_then(|s| s.parse::<u16>().ok());
+    let reply_sport = extract_kv_from_list(&all_kv, "sport", 1).and_then(|s| s.parse::<u16>().ok());
+    let reply_dport = extract_kv_from_list(&all_kv, "dport", 1).and_then(|s| s.parse::<u16>().ok());
 
     Some(ConntrackEvent {
         timestamp,
@@ -210,8 +208,7 @@ mod tests {
 
     #[test]
     fn missing_port_returns_none() {
-        let line =
-            "[1711468800.123456]      [NEW] tcp      6 120 SYN_SENT src=192.168.1.100 dst=93.184.216.34";
+        let line = "[1711468800.123456]      [NEW] tcp      6 120 SYN_SENT src=192.168.1.100 dst=93.184.216.34";
         assert!(parse_conntrack_line(line).is_none());
     }
 

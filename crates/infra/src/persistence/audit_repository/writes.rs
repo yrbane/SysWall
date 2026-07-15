@@ -9,10 +9,7 @@ use super::SqliteAuditRepository;
 impl SqliteAuditRepository {
     /// Insère un événement d'audit.
     /// Insert a single audit event.
-    pub(super) async fn run_append(
-        &self,
-        event: AuditEvent,
-    ) -> Result<(), DomainError> {
+    pub(super) async fn run_append(&self, event: AuditEvent) -> Result<(), DomainError> {
         let db = self.db.clone();
         tokio::task::spawn_blocking(move || {
             db.with_writer(|conn| {

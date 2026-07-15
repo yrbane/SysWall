@@ -31,14 +31,8 @@ mod tests {
         Connection {
             id: ConnectionId::new(),
             protocol,
-            source: SocketAddress::new(
-                "192.168.1.100".parse().unwrap(),
-                Port::new(45000).unwrap(),
-            ),
-            destination: SocketAddress::new(
-                dst_ip.parse().unwrap(),
-                Port::new(dst_port).unwrap(),
-            ),
+            source: SocketAddress::new("192.168.1.100".parse().unwrap(), Port::new(45000).unwrap()),
+            destination: SocketAddress::new(dst_ip.parse().unwrap(), Port::new(dst_port).unwrap()),
             direction,
             state: ConnectionState::New,
             process: Some(ProcessInfo {
@@ -69,11 +63,7 @@ mod tests {
         let event_bus = Arc::new(FakeEventBus::new());
         let process_resolver = Arc::new(FakeProcessResolver::new());
 
-        let rule_service = RuleService::new(
-            rule_repo.clone(),
-            firewall.clone(),
-            event_bus.clone(),
-        );
+        let rule_service = RuleService::new(rule_repo.clone(), firewall.clone(), event_bus.clone());
 
         // Create an allow rule for HTTPS
         let _rule = rule_service
@@ -142,11 +132,7 @@ mod tests {
         let event_bus = Arc::new(FakeEventBus::new());
         let process_resolver = Arc::new(FakeProcessResolver::new());
 
-        let rule_service = RuleService::new(
-            rule_repo.clone(),
-            firewall.clone(),
-            event_bus.clone(),
-        );
+        let rule_service = RuleService::new(rule_repo.clone(), firewall.clone(), event_bus.clone());
 
         // Create system whitelist
         ensure_system_whitelist(&rule_service, rule_repo.as_ref())
@@ -164,17 +150,26 @@ mod tests {
 
         // DNS query should be allowed by whitelist
         let dns_conn = make_connection(Protocol::Udp, "8.8.8.8", 53, Direction::Outbound);
-        let result = connection_service.process_connection(dns_conn).await.unwrap();
+        let result = connection_service
+            .process_connection(dns_conn)
+            .await
+            .unwrap();
         assert_eq!(result.verdict, ConnectionVerdict::Allowed);
 
         // NTP should be allowed by whitelist
         let ntp_conn = make_connection(Protocol::Udp, "129.6.15.28", 123, Direction::Outbound);
-        let result = connection_service.process_connection(ntp_conn).await.unwrap();
+        let result = connection_service
+            .process_connection(ntp_conn)
+            .await
+            .unwrap();
         assert_eq!(result.verdict, ConnectionVerdict::Allowed);
 
         // Random HTTP should be blocked (default policy = Block)
         let http_conn = make_connection(Protocol::Tcp, "93.184.216.34", 80, Direction::Outbound);
-        let result = connection_service.process_connection(http_conn).await.unwrap();
+        let result = connection_service
+            .process_connection(http_conn)
+            .await
+            .unwrap();
         assert_eq!(result.verdict, ConnectionVerdict::Blocked);
     }
 
@@ -188,11 +183,7 @@ mod tests {
         let decision_repo = Arc::new(FakeDecisionRepository::new());
         let notifier = Arc::new(FakeUserNotifier::new());
 
-        let rule_service = RuleService::new(
-            rule_repo.clone(),
-            firewall.clone(),
-            event_bus.clone(),
-        );
+        let rule_service = RuleService::new(rule_repo.clone(), firewall.clone(), event_bus.clone());
 
         // Create an Ask rule
         rule_service

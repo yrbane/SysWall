@@ -121,16 +121,11 @@ impl NftablesFirewallAdapter {
                 .args(cmd.args())
                 .output()
                 .await
-                .map_err(|e| {
-                    DomainError::Infrastructure(format!("Failed to execute nft: {}", e))
-                })
+                .map_err(|e| DomainError::Infrastructure(format!("Failed to execute nft: {}", e)))
         })
         .await
         .map_err(|_| {
-            DomainError::Infrastructure(format!(
-                "nft command timed out after {:?}",
-                cmd.timeout()
-            ))
+            DomainError::Infrastructure(format!("nft command timed out after {:?}", cmd.timeout()))
         })??;
 
         if !output.status.success() {
@@ -165,7 +160,11 @@ impl NftablesFirewallAdapter {
         self.execute_nft(&NftCommandBuilder::create_table(table))
             .await?;
 
-        for (chain, hook) in [("input", "input"), ("output", "output"), ("forward", "forward")] {
+        for (chain, hook) in [
+            ("input", "input"),
+            ("output", "output"),
+            ("forward", "forward"),
+        ] {
             self.execute_nft(&NftCommandBuilder::create_chain(table, chain, hook, 0))
                 .await?;
         }
@@ -175,9 +174,12 @@ impl NftablesFirewallAdapter {
         if let Some(queue_num) = self.interception_queue {
             // Crée la chaîne d'interception (idempotent — "File exists" ignoré par execute_nft).
             // Create the interception chain (idempotent — "File exists" ignored by execute_nft).
-            self.execute_nft(
-                &NftCommandBuilder::create_chain(table, "interception", "output", 0)
-            )
+            self.execute_nft(&NftCommandBuilder::create_chain(
+                table,
+                "interception",
+                "output",
+                0,
+            ))
             .await?;
 
             // Règle loopback : évite tout deadlock IPC.
@@ -218,7 +220,6 @@ impl NftablesFirewallAdapter {
 
 #[async_trait]
 impl FirewallEngine for NftablesFirewallAdapter {
-
     async fn drop_all(&self) -> Result<(), DomainError> {
         for chain in &["output", "input"] {
             let cmd = NftCommandBuilder::add_rule(&self.config.table_name, chain)
@@ -238,17 +239,23 @@ impl FirewallEngine for NftablesFirewallAdapter {
             .arg("inet")
             .arg(&self.config.table_name)
             .arg("-a");
-        let output = self.execute_nft(&list_cmd_with_handles).await.unwrap_or_default();
+        let output = self
+            .execute_nft(&list_cmd_with_handles)
+            .await
+            .unwrap_or_default();
 
         for line in output.lines() {
             if line.contains("syswall-killswitch")
                 && let Some(handle_str) = line.rsplit("handle ").next()
                 && let Ok(handle) = handle_str.trim().parse::<u64>()
             {
-                let chain = if line.contains("output") { "output" } else { "input" };
-                let del_cmd = NftCommandBuilder::delete_rule(
-                    &self.config.table_name, chain, handle,
-                );
+                let chain = if line.contains("output") {
+                    "output"
+                } else {
+                    "input"
+                };
+                let del_cmd =
+                    NftCommandBuilder::delete_rule(&self.config.table_name, chain, handle);
                 let _ = self.execute_nft(&del_cmd).await;
             }
         }
@@ -351,7 +358,11 @@ impl FirewallEngine for NftablesFirewallAdapter {
     /// Supprime une règle de nftables par son identifiant du domaine.
     /// Remove a rule from nftables by its domain ID.
     async fn remove_rule(&self, rule_id: &RuleId) -> Result<(), DomainError> {
-        let handles = self.handle_map.lock().expect("Mutex jamais empoisonné / never poisoned").remove(rule_id);
+        let handles = self
+            .handle_map
+            .lock()
+            .expect("Mutex jamais empoisonné / never poisoned")
+            .remove(rule_id);
 
         let handles = match handles {
             Some(h) => h,
@@ -411,13 +422,10 @@ impl FirewallEngine for NftablesFirewallAdapter {
                 .and_then(|c| extract_rule_id_from_comment(c))
             {
                 nft_rule_ids.insert(uuid);
-                nft_handles
-                    .entry(uuid)
-                    .or_default()
-                    .push(NftRuleHandle {
-                        chain: entry.chain.clone(),
-                        handle: entry.handle,
-                    });
+                nft_handles.entry(uuid).or_default().push(NftRuleHandle {
+                    chain: entry.chain.clone(),
+                    handle: entry.handle,
+                });
             }
         }
 
@@ -426,10 +434,8 @@ impl FirewallEngine for NftablesFirewallAdapter {
             .filter(|r| r.enabled && !r.is_expired() && r.effect != RuleEffect::Ask)
             .collect();
 
-        let desired_ids: std::collections::HashSet<uuid::Uuid> = desired_rules
-            .iter()
-            .map(|r| *r.id.as_uuid())
-            .collect();
+        let desired_ids: std::collections::HashSet<uuid::Uuid> =
+            desired_rules.iter().map(|r| *r.id.as_uuid()).collect();
 
         let to_remove: Vec<uuid::Uuid> = nft_rule_ids.difference(&desired_ids).cloned().collect();
         let to_add: Vec<&&Rule> = desired_rules
@@ -476,10 +482,7 @@ impl FirewallEngine for NftablesFirewallAdapter {
                 .and_then(|c| extract_rule_id_from_comment(c))
             {
                 let rule_id = RuleId::from_uuid(uuid);
-                let mut handles = new_handle_map
-                    .get(&rule_id)
-                    .cloned()
-                    .unwrap_or_default();
+                let mut handles = new_handle_map.get(&rule_id).cloned().unwrap_or_default();
                 handles.push(NftRuleHandle {
                     chain: entry.chain.clone(),
                     handle: entry.handle,
@@ -487,8 +490,14 @@ impl FirewallEngine for NftablesFirewallAdapter {
                 new_handle_map.insert(rule_id, handles);
             }
         }
-        *self.handle_map.lock().expect("Mutex jamais empoisonné / never poisoned") = new_handle_map;
-        *self.nftables_synced.lock().expect("Mutex jamais empoisonné / never poisoned") = true;
+        *self
+            .handle_map
+            .lock()
+            .expect("Mutex jamais empoisonné / never poisoned") = new_handle_map;
+        *self
+            .nftables_synced
+            .lock()
+            .expect("Mutex jamais empoisonné / never poisoned") = true;
 
         info!(
             "nftables sync complete: removed {}, added {}",
@@ -527,7 +536,10 @@ impl FirewallEngine for NftablesFirewallAdapter {
     /// Retourne l'état actuel du pare-feu.
     /// Get the current firewall status.
     async fn get_status(&self) -> Result<FirewallStatus, DomainError> {
-        let synced = *self.nftables_synced.lock().expect("Mutex jamais empoisonné / never poisoned");
+        let synced = *self
+            .nftables_synced
+            .lock()
+            .expect("Mutex jamais empoisonné / never poisoned");
 
         let json = self
             .execute_nft(&NftCommandBuilder::list_table(&self.config.table_name))

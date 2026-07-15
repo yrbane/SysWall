@@ -20,15 +20,10 @@ pub struct PolicyEvaluation {
 /// Pourquoi un verdict particulier a été atteint.
 #[derive(Debug, Clone)]
 pub enum EvaluationReason {
-    MatchedRule {
-        rule_id: RuleId,
-        effect: RuleEffect,
-    },
+    MatchedRule { rule_id: RuleId, effect: RuleEffect },
     NoMatchingRule,
     PendingUserDecision,
-    DefaultPolicyApplied {
-        policy: DefaultPolicy,
-    },
+    DefaultPolicyApplied { policy: DefaultPolicy },
 }
 
 /// Pure domain service -- no I/O, no ports.

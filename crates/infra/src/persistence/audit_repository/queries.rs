@@ -27,7 +27,9 @@ impl SqliteAuditRepository {
 
         Ok(AuditEvent {
             id: EventId::from_uuid(
-                id_str.parse().expect("UUID stocké par notre code / stored by our code"),
+                id_str
+                    .parse()
+                    .expect("UUID stocké par notre code / stored by our code"),
             ),
             timestamp: timestamp_str
                 .parse()
@@ -129,10 +131,7 @@ impl SqliteAuditRepository {
 
     /// Compte les événements correspondant aux filtres.
     /// Count events matching the filters.
-    pub(super) async fn run_count(
-        &self,
-        filters: AuditFilters,
-    ) -> Result<u64, DomainError> {
+    pub(super) async fn run_count(&self, filters: AuditFilters) -> Result<u64, DomainError> {
         let db = self.db.clone();
         tokio::task::spawn_blocking(move || {
             db.with_writer(|conn| {

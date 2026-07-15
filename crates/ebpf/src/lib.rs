@@ -44,10 +44,7 @@ impl EbpfProcessResolver {
     /// Attempt to load the eBPF program. Returns Err if loading fails.
     pub fn try_new() -> Result<Self, DomainError> {
         let mut ebpf = aya::Ebpf::load(BPF_PROG_BYTES).map_err(|e| {
-            DomainError::Infrastructure(format!(
-                "Échec du chargement du programme eBPF: {}",
-                e
-            ))
+            DomainError::Infrastructure(format!("Échec du chargement du programme eBPF: {}", e))
         })?;
 
         // Initialisation des logs eBPF (optionnel, best-effort)
@@ -72,19 +69,11 @@ impl EbpfProcessResolver {
             })?;
 
         program.load().map_err(|e| {
-            DomainError::Infrastructure(format!(
-                "Échec du chargement du tracepoint BPF: {}",
-                e
-            ))
+            DomainError::Infrastructure(format!("Échec du chargement du tracepoint BPF: {}", e))
         })?;
-        program
-            .attach("sock", "inet_sock_set_state")
-            .map_err(|e| {
-                DomainError::Infrastructure(format!(
-                    "Échec de l'attachement au tracepoint BPF: {}",
-                    e
-                ))
-            })?;
+        program.attach("sock", "inet_sock_set_state").map_err(|e| {
+            DomainError::Infrastructure(format!("Échec de l'attachement au tracepoint BPF: {}", e))
+        })?;
 
         info!("Tracepoint eBPF inet_sock_set_state attaché avec succès");
 
@@ -93,14 +82,13 @@ impl EbpfProcessResolver {
         let socket_map: Arc<SocketMap> = Arc::new(DashMap::new());
         let map_clone = socket_map.clone();
 
-        let ring_buf = aya::maps::RingBuf::try_from(
-            ebpf.take_map("EVENTS").ok_or_else(|| {
+        let ring_buf =
+            aya::maps::RingBuf::try_from(ebpf.take_map("EVENTS").ok_or_else(|| {
                 DomainError::Infrastructure("Map BPF 'EVENTS' introuvable".into())
-            })?,
-        )
-        .map_err(|e| {
-            DomainError::Infrastructure(format!("Erreur de création du RingBuf: {}", e))
-        })?;
+            })?)
+            .map_err(|e| {
+                DomainError::Infrastructure(format!("Erreur de création du RingBuf: {}", e))
+            })?;
 
         let drain_handle = tokio::spawn(async move {
             Self::drain_ring_buffer(ring_buf, map_clone).await;
@@ -124,9 +112,8 @@ impl EbpfProcessResolver {
                 if event_data.len() < std::mem::size_of::<SocketEvent>() {
                     continue;
                 }
-                let event: SocketEvent = unsafe {
-                    std::ptr::read_unaligned(event_data.as_ptr() as *const SocketEvent)
-                };
+                let event: SocketEvent =
+                    unsafe { std::ptr::read_unaligned(event_data.as_ptr() as *const SocketEvent) };
 
                 if event.pid > 0 && event.sport > 0 {
                     map.insert((event.protocol, event.sport), event.pid);
@@ -271,11 +258,7 @@ fn read_process_info_from_proc(pid: u32) -> Option<ProcessInfo> {
             .replace('\0', " ")
             .trim()
             .to_string();
-        if s.is_empty() {
-            None
-        } else {
-            Some(s)
-        }
+        if s.is_empty() { None } else { Some(s) }
     });
 
     let status = std::fs::read_to_string(proc_path.join("status")).ok()?;
@@ -312,10 +295,7 @@ mod tests {
                 icon: None,
             }))
         }
-        async fn resolve_by_socket(
-            &self,
-            _: u64,
-        ) -> Result<Option<ProcessInfo>, DomainError> {
+        async fn resolve_by_socket(&self, _: u64) -> Result<Option<ProcessInfo>, DomainError> {
             Ok(None)
         }
     }

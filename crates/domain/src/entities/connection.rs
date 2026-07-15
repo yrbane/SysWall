@@ -136,10 +136,7 @@ mod tests {
         Connection {
             id: ConnectionId::new(),
             protocol: Protocol::Tcp,
-            source: SocketAddress::new(
-                "192.168.1.100".parse().unwrap(),
-                Port::new(45000).unwrap(),
-            ),
+            source: SocketAddress::new("192.168.1.100".parse().unwrap(), Port::new(45000).unwrap()),
             destination: SocketAddress::new(
                 "93.184.216.34".parse().unwrap(),
                 Port::new(443).unwrap(),

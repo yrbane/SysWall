@@ -141,11 +141,7 @@ mod tests {
 
     #[test]
     fn authentication_category_exists() {
-        let event = AuditEvent::new(
-            Severity::Warning,
-            EventCategory::Authentication,
-            "denied",
-        );
+        let event = AuditEvent::new(Severity::Warning, EventCategory::Authentication, "denied");
         assert_eq!(event.category, EventCategory::Authentication);
     }
 

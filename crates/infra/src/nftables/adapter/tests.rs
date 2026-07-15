@@ -2,7 +2,7 @@
 //! Unit tests for the adapter module.
 use super::*;
 use chrono::Utc;
-use syswall_domain::entities::{RuleEffect, RuleScope, RuleSource, RuleCriteria, RuleId};
+use syswall_domain::entities::{RuleCriteria, RuleEffect, RuleId, RuleScope, RuleSource};
 use syswall_domain::value_objects::{Protocol, RulePriority};
 
 /// Construit une Rule de test avec protocole et ports optionnels.
@@ -22,10 +22,8 @@ fn build_test_rule(
         enabled: true,
         criteria: RuleCriteria {
             protocol,
-            remote_port: remote_port
-                .map(|p| PortMatcher::Exact(Port::new(p).unwrap())),
-            local_port: local_port
-                .map(|p| PortMatcher::Exact(Port::new(p).unwrap())),
+            remote_port: remote_port.map(|p| PortMatcher::Exact(Port::new(p).unwrap())),
+            local_port: local_port.map(|p| PortMatcher::Exact(Port::new(p).unwrap())),
             remote_ip,
             ..Default::default()
         },
@@ -71,10 +69,7 @@ fn whitelist_random_port_is_not_whitelist() {
 fn nftables_config_default_values() {
     let config = NftablesConfig::default();
     assert_eq!(config.table_name, "syswall");
-    assert_eq!(
-        config.nft_binary_path,
-        PathBuf::from("/usr/sbin/nft")
-    );
+    assert_eq!(config.nft_binary_path, PathBuf::from("/usr/sbin/nft"));
     assert_eq!(config.command_timeout, Duration::from_secs(5));
     assert_eq!(config.max_output_bytes, 1_048_576);
 }

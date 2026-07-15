@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use thiserror::Error;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{Mutex, oneshot};
 use tokio::task::JoinHandle;
 
 use syswall_domain::entities::{AuditEvent, EventCategory, Severity};
@@ -15,8 +15,7 @@ use syswall_domain::ports::{AuditRepository, EventBus};
 
 /// Future retourné par un callback de rollback.
 /// Future returned by a rollback callback.
-pub type RollbackFuture =
-    Pin<Box<dyn Future<Output = Result<(), DomainError>> + Send + 'static>>;
+pub type RollbackFuture = Pin<Box<dyn Future<Output = Result<(), DomainError>> + Send + 'static>>;
 
 /// Closure exécutée quand la connectivité est perdue. Effectue le rollback réel.
 /// Closure executed when connectivity is lost. Performs the actual rollback.
@@ -102,10 +101,22 @@ impl AntilockoutGuard {
         let event_bus = self.event_bus.clone();
         let state_clone = self.state.clone();
         let join_handle = tokio::spawn(async move {
-            run_guard_loop(probe, audit, config, event_bus, rolled_back_count, rollback, cancel_rx).await;
+            run_guard_loop(
+                probe,
+                audit,
+                config,
+                event_bus,
+                rolled_back_count,
+                rollback,
+                cancel_rx,
+            )
+            .await;
             *state_clone.lock().await = None;
         });
-        *state = Some(ArmedState { cancel_tx, join_handle });
+        *state = Some(ArmedState {
+            cancel_tx,
+            join_handle,
+        });
         Ok(())
     }
 
@@ -138,9 +149,8 @@ async fn run_guard_loop(
     rollback: RollbackFn,
     mut cancel_rx: oneshot::Receiver<()>,
 ) {
-    let max_ticks = (config.timeout.as_secs_f64() / config.probe_interval.as_secs_f64()).ceil()
-        as u32
-        + 1;
+    let max_ticks =
+        (config.timeout.as_secs_f64() / config.probe_interval.as_secs_f64()).ceil() as u32 + 1;
     for tick in 0..max_ticks {
         if tick > 0 {
             tokio::select! {
@@ -233,7 +243,12 @@ mod tests {
     async fn arm_then_probe_reachable_does_not_rollback() {
         let probe = Arc::new(FakeConnectivityProbe::always_reachable());
         let audit = Arc::new(FakeAuditRepository::new());
-        let guard = AntilockoutGuard::new(probe, audit.clone(), AntilockoutConfig::default(), fake_bus());
+        let guard = AntilockoutGuard::new(
+            probe,
+            audit.clone(),
+            AntilockoutConfig::default(),
+            fake_bus(),
+        );
         guard.arm(2, noop_rollback()).await.unwrap();
         // Céder la main pour que la tâche spawned exécute son premier probe à T=0.
         tokio::task::yield_now().await;
@@ -270,7 +285,12 @@ mod tests {
         // Abonnement avant l'armement pour capturer l'événement domaine publié ultérieurement.
         // Subscribe before arming so we can capture the domain event published later.
         let mut rx = bus.sender().subscribe();
-        let guard = AntilockoutGuard::new(probe, audit.clone(), AntilockoutConfig::default(), bus.clone());
+        let guard = AntilockoutGuard::new(
+            probe,
+            audit.clone(),
+            AntilockoutConfig::default(),
+            bus.clone(),
+        );
         let counter = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let counter_clone = counter.clone();
         let rollback: RollbackFn = Box::new(move || {
@@ -296,14 +316,19 @@ mod tests {
         assert_eq!(counter.load(std::sync::atomic::Ordering::SeqCst), 1);
         assert!(!guard.is_armed().await);
         let events = audit.snapshot().await;
-        assert!(events
-            .iter()
-            .any(|e| e.severity == syswall_domain::entities::Severity::Critical
-                && e.category == syswall_domain::entities::EventCategory::Antilockout));
+        assert!(events.iter().any(
+            |e| e.severity == syswall_domain::entities::Severity::Critical
+                && e.category == syswall_domain::entities::EventCategory::Antilockout
+        ));
         // Vérifie que l'événement domaine AntilockoutTriggered a été publié.
         // Verify that the AntilockoutTriggered domain event was published.
         assert!(
-            matches!(rx.try_recv(), Ok(DomainEvent::AntilockoutTriggered { rolled_back_count: 3 })),
+            matches!(
+                rx.try_recv(),
+                Ok(DomainEvent::AntilockoutTriggered {
+                    rolled_back_count: 3
+                })
+            ),
             "AntilockoutTriggered domain event not published"
         );
     }

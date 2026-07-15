@@ -16,9 +16,7 @@ impl PolicyEngine {
             if let Some(ref process) = connection.process {
                 let matched = match app_matcher {
                     AppMatcher::ByName(name) => process.name == *name,
-                    AppMatcher::ByPath(path) => {
-                        process.path.as_ref().is_some_and(|p| p == path)
-                    }
+                    AppMatcher::ByPath(path) => process.path.as_ref().is_some_and(|p| p == path),
                     AppMatcher::ByHash(_hash) => false, // Hash matching deferred to sub-project 2
                 };
                 if !matched {
@@ -38,50 +36,49 @@ impl PolicyEngine {
         }
 
         if let Some(ref ip_matcher) = criteria.remote_ip {
-            let remote_ip =
-                if connection.direction == crate::value_objects::Direction::Outbound {
-                    connection.destination.ip
-                } else {
-                    connection.source.ip
-                };
+            let remote_ip = if connection.direction == crate::value_objects::Direction::Outbound {
+                connection.destination.ip
+            } else {
+                connection.source.ip
+            };
             if !Self::matches_ip(ip_matcher, remote_ip) {
                 return false;
             }
         }
 
         if let Some(ref port_matcher) = criteria.remote_port {
-            let remote_port =
-                if connection.direction == crate::value_objects::Direction::Outbound {
-                    connection.destination.port
-                } else {
-                    connection.source.port
-                };
+            let remote_port = if connection.direction == crate::value_objects::Direction::Outbound {
+                connection.destination.port
+            } else {
+                connection.source.port
+            };
             if !Self::matches_port(port_matcher, remote_port) {
                 return false;
             }
         }
 
         if let Some(ref port_matcher) = criteria.local_port {
-            let local_port =
-                if connection.direction == crate::value_objects::Direction::Outbound {
-                    connection.source.port
-                } else {
-                    connection.destination.port
-                };
+            let local_port = if connection.direction == crate::value_objects::Direction::Outbound {
+                connection.source.port
+            } else {
+                connection.destination.port
+            };
             if !Self::matches_port(port_matcher, local_port) {
                 return false;
             }
         }
 
         if let Some(ref proto) = criteria.protocol
-            && connection.protocol != *proto {
-                return false;
-            }
+            && connection.protocol != *proto
+        {
+            return false;
+        }
 
         if let Some(ref dir) = criteria.direction
-            && connection.direction != *dir {
-                return false;
-            }
+            && connection.direction != *dir
+        {
+            return false;
+        }
 
         // Schedule matching deferred to sub-project 4
 
@@ -150,10 +147,7 @@ pub(super) mod tests {
         Connection {
             id: ConnectionId::new(),
             protocol: Protocol::Tcp,
-            source: SocketAddress::new(
-                "192.168.1.100".parse().unwrap(),
-                Port::new(45000).unwrap(),
-            ),
+            source: SocketAddress::new("192.168.1.100".parse().unwrap(), Port::new(45000).unwrap()),
             destination: SocketAddress::new(
                 "93.184.216.34".parse().unwrap(),
                 Port::new(443).unwrap(),

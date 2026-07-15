@@ -41,7 +41,9 @@ impl SqlitePendingDecisionRepository {
 
         Ok(PendingDecision {
             id: PendingDecisionId::from_uuid(
-                id_str.parse().expect("UUID stocké par notre code / stored by our code"),
+                id_str
+                    .parse()
+                    .expect("UUID stocké par notre code / stored by our code"),
             ),
             connection_snapshot: serde_json::from_str::<ConnectionSnapshot>(&snapshot_json)
                 .expect("JSON sérialisé par notre code / serialized by our code"),
@@ -160,10 +162,7 @@ impl PendingDecisionRepository for SqlitePendingDecisionRepository {
         .map_err(|e| DomainError::Infrastructure(format!("Spawn blocking failed: {}", e)))?
     }
 
-    async fn find_by_dedup_key(
-        &self,
-        key: &str,
-    ) -> Result<Option<PendingDecision>, DomainError> {
+    async fn find_by_dedup_key(&self, key: &str) -> Result<Option<PendingDecision>, DomainError> {
         let key = key.to_string();
         let db = self.db.clone();
         tokio::task::spawn_blocking(move || {

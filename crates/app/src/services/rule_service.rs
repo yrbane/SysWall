@@ -135,7 +135,11 @@ mod tests {
     use crate::fakes::*;
     use syswall_domain::entities::*;
 
-    fn setup() -> (RuleService, Arc<FakeRuleRepository>, Arc<FakeFirewallEngine>) {
+    fn setup() -> (
+        RuleService,
+        Arc<FakeRuleRepository>,
+        Arc<FakeFirewallEngine>,
+    ) {
         let rule_repo = Arc::new(FakeRuleRepository::new());
         let firewall = Arc::new(FakeFirewallEngine::new());
         let event_bus = Arc::new(FakeEventBus::new());
@@ -208,9 +212,11 @@ mod tests {
 
         // Verify firewall remove was called
         let calls = firewall.calls.lock().unwrap();
-        assert!(calls
-            .iter()
-            .any(|c| matches!(c, FirewallCall::RemoveRule(_))));
+        assert!(
+            calls
+                .iter()
+                .any(|c| matches!(c, FirewallCall::RemoveRule(_)))
+        );
     }
 
     #[tokio::test]

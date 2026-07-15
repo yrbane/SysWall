@@ -30,7 +30,9 @@ pub trait FirewallEngine: Send + Sync {
     /// Rétablit le trafic réseau après un kill-switch.
     /// Restore network traffic after kill-switch.
     async fn remove_drop_all(&self) -> Result<(), DomainError> {
-        Err(DomainError::Infrastructure("remove_drop_all not supported".into()))
+        Err(DomainError::Infrastructure(
+            "remove_drop_all not supported".into(),
+        ))
     }
 }
 

@@ -66,20 +66,35 @@ impl ConnectionService {
                 Ok(Some(info)) => {
                     tracing::debug!(
                         "Resolved process for {}:{} -> {}:{}: {} (PID {})",
-                        local_ip, local_port, remote_ip, remote_port,
-                        info.name, info.pid
+                        local_ip,
+                        local_port,
+                        remote_ip,
+                        remote_port,
+                        info.name,
+                        info.pid
                     );
                     connection.process = Some(info);
                 }
                 Ok(None) => {
                     tracing::warn!(
                         "No process found for {:?} {}:{} -> {}:{}",
-                        connection.protocol, local_ip, local_port, remote_ip, remote_port
+                        connection.protocol,
+                        local_ip,
+                        local_port,
+                        remote_ip,
+                        remote_port
                     );
                 }
                 Err(e) => {
-                    tracing::warn!("Process resolution failed for {:?} {}:{} -> {}:{}: {}",
-                        connection.protocol, local_ip, local_port, remote_ip, remote_port, e);
+                    tracing::warn!(
+                        "Process resolution failed for {:?} {}:{} -> {}:{}: {}",
+                        connection.protocol,
+                        local_ip,
+                        local_port,
+                        remote_ip,
+                        remote_port,
+                        e
+                    );
                 }
             }
         }
@@ -143,10 +158,7 @@ mod tests {
         Connection {
             id: ConnectionId::new(),
             protocol: Protocol::Tcp,
-            source: SocketAddress::new(
-                "192.168.1.100".parse().unwrap(),
-                Port::new(45000).unwrap(),
-            ),
+            source: SocketAddress::new("192.168.1.100".parse().unwrap(), Port::new(45000).unwrap()),
             destination: SocketAddress::new(
                 "93.184.216.34".parse().unwrap(),
                 Port::new(443).unwrap(),

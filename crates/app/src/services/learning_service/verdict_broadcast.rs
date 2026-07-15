@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::{Mutex, broadcast};
 
 use syswall_domain::entities::PendingDecisionId;
 use syswall_domain::ports::interception::PacketVerdict;
@@ -25,9 +25,7 @@ impl VerdictBroadcasts {
     /// Abonne un receveur à un broadcast existant (création si absent).
     pub async fn subscribe(&self, id: PendingDecisionId) -> broadcast::Receiver<PacketVerdict> {
         let mut map = self.inner.lock().await;
-        let sender = map
-            .entry(id)
-            .or_insert_with(|| broadcast::channel(64).0);
+        let sender = map.entry(id).or_insert_with(|| broadcast::channel(64).0);
         sender.subscribe()
     }
 

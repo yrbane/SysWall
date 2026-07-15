@@ -3,9 +3,9 @@
 
 use std::sync::Arc;
 
+use syswall_domain::entities::{AuditEvent, AuditStats};
 use syswall_domain::errors::DomainError;
 use syswall_domain::events::Pagination;
-use syswall_domain::entities::{AuditEvent, AuditStats};
 use syswall_domain::ports::{AuditFilters, AuditRepository};
 
 use super::{AuditService, ExportFormat};

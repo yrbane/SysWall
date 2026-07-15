@@ -93,10 +93,7 @@ mod tests {
         Connection {
             id: ConnectionId::new(),
             protocol: Protocol::Tcp,
-            source: SocketAddress::new(
-                "127.0.0.1".parse().unwrap(),
-                Port::new(12345).unwrap(),
-            ),
+            source: SocketAddress::new("127.0.0.1".parse().unwrap(), Port::new(12345).unwrap()),
             destination: SocketAddress::new(
                 "93.184.216.34".parse().unwrap(),
                 Port::new(443).unwrap(),
@@ -131,9 +128,10 @@ mod tests {
         let cancel = CancellationToken::new();
         fake.run(Arc::new(AlwaysAccept), cancel).await.unwrap();
         assert_eq!(fake.captured_verdicts().len(), 2);
-        assert!(fake
-            .captured_verdicts()
-            .iter()
-            .all(|v| *v == PacketVerdict::Accept));
+        assert!(
+            fake.captured_verdicts()
+                .iter()
+                .all(|v| *v == PacketVerdict::Accept)
+        );
     }
 }

@@ -37,8 +37,7 @@ pub fn parse_packet(bytes: &[u8]) -> Result<Connection, ParseError> {
     if bytes.len() < 20 {
         return Err(ParseError::Malformed);
     }
-    let parsed =
-        SlicedPacket::from_ip(bytes).map_err(|e| ParseError::Etherparse(e.to_string()))?;
+    let parsed = SlicedPacket::from_ip(bytes).map_err(|e| ParseError::Etherparse(e.to_string()))?;
 
     let (src_ip, dst_ip): (IpAddr, IpAddr) = match &parsed.net {
         Some(NetSlice::Ipv4(h)) => {
@@ -103,7 +102,9 @@ mod tests {
         let builder = etherparse::PacketBuilder::ipv4([10, 0, 0, 1], [1, 2, 3, 4], 64)
             .tcp(12345, 443, 0, 1024);
         let payload: &[u8] = &[];
-        builder.write(&mut buffer, payload).expect("etherparse builder ok");
+        builder
+            .write(&mut buffer, payload)
+            .expect("etherparse builder ok");
         buffer
     }
 
@@ -112,7 +113,9 @@ mod tests {
         let builder =
             etherparse::PacketBuilder::ipv4([10, 0, 0, 1], [1, 1, 1, 1], 64).udp(54321, 53);
         let payload: &[u8] = b"\x00\x00";
-        builder.write(&mut buffer, payload).expect("etherparse builder ok");
+        builder
+            .write(&mut buffer, payload)
+            .expect("etherparse builder ok");
         buffer
     }
 
@@ -129,7 +132,9 @@ mod tests {
         )
         .udp(12345, 53);
         let payload: &[u8] = b"\x12\x34";
-        builder.write(&mut buffer, payload).expect("etherparse builder ok");
+        builder
+            .write(&mut buffer, payload)
+            .expect("etherparse builder ok");
         buffer
     }
 

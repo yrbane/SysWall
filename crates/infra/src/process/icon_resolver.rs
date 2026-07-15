@@ -31,10 +31,7 @@ impl IconResolver {
     /// Build a new resolver by detecting the GTK theme and indexing .desktop files.
     pub fn new() -> Self {
         let theme_chain = Self::detect_theme_chain();
-        info!(
-            "IconResolver: thème d'icônes détecté : {:?}",
-            theme_chain
-        );
+        info!("IconResolver: thème d'icônes détecté : {:?}", theme_chain);
 
         let desktop_index = Self::index_desktop_files();
         debug!(
@@ -52,7 +49,12 @@ impl IconResolver {
     /// Résout le chemin d'une icône pour un nom d'exécutable ou un chemin complet.
     /// Resolve an icon path for an executable name or full path.
     pub fn resolve(&self, exe_name: &str, exe_path: Option<&Path>) -> Option<String> {
-        if let Some(cached) = self.cache.lock().expect("Mutex jamais empoisonné / never poisoned").get(exe_name) {
+        if let Some(cached) = self
+            .cache
+            .lock()
+            .expect("Mutex jamais empoisonné / never poisoned")
+            .get(exe_name)
+        {
             return cached.clone();
         }
 
@@ -168,7 +170,11 @@ impl IconResolver {
                         if let Some(theme) = line.strip_prefix("gtk-icon-theme-name=") {
                             let theme = theme.trim().to_string();
                             if !theme.is_empty() {
-                                debug!("Thème d'icônes trouvé dans {}: {}", settings_path.display(), theme);
+                                debug!(
+                                    "Thème d'icônes trouvé dans {}: {}",
+                                    settings_path.display(),
+                                    theme
+                                );
                                 return Some(theme);
                             }
                         }
@@ -246,7 +252,9 @@ impl IconResolver {
             return None;
         }
 
-        let preferred_sizes = ["48x48", "64x64", "32x32", "128x128", "256x256", "scalable", "24x24", "22x22", "16x16"];
+        let preferred_sizes = [
+            "48x48", "64x64", "32x32", "128x128", "256x256", "scalable", "24x24", "22x22", "16x16",
+        ];
         let extensions = ["svg", "png", "xpm"];
 
         // Chercher dans chaque thème de la chaîne
@@ -299,9 +307,7 @@ impl IconResolver {
         let dirs = [
             PathBuf::from("/usr/share/applications"),
             PathBuf::from("/usr/local/share/applications"),
-            dirs::data_dir()
-                .unwrap_or_default()
-                .join("applications"),
+            dirs::data_dir().unwrap_or_default().join("applications"),
         ];
 
         for dir in &dirs {

@@ -39,7 +39,8 @@ impl AuditRepository for SqliteAuditRepository {
         filters: &AuditFilters,
         pagination: &Pagination,
     ) -> Result<Vec<AuditEvent>, DomainError> {
-        self.run_query(filters.clone(), pagination.offset, pagination.limit).await
+        self.run_query(filters.clone(), pagination.offset, pagination.limit)
+            .await
     }
 
     async fn count(&self, filters: &AuditFilters) -> Result<u64, DomainError> {
@@ -136,15 +137,27 @@ mod tests {
     async fn query_filter_by_severity() {
         let repo = setup().await;
 
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::Rule, "info event"))
-            .await
-            .unwrap();
-        repo.append(&AuditEvent::new(Severity::Error, EventCategory::Rule, "error event"))
-            .await
-            .unwrap();
-        repo.append(&AuditEvent::new(Severity::Warning, EventCategory::Rule, "warning event"))
-            .await
-            .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::Rule,
+            "info event",
+        ))
+        .await
+        .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Error,
+            EventCategory::Rule,
+            "error event",
+        ))
+        .await
+        .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Warning,
+            EventCategory::Rule,
+            "warning event",
+        ))
+        .await
+        .unwrap();
 
         let filters = AuditFilters {
             severity: Some(Severity::Error),
@@ -159,12 +172,20 @@ mod tests {
     async fn query_filter_by_category() {
         let repo = setup().await;
 
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::Rule, "rule event"))
-            .await
-            .unwrap();
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::System, "system event"))
-            .await
-            .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::Rule,
+            "rule event",
+        ))
+        .await
+        .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::System,
+            "system event",
+        ))
+        .await
+        .unwrap();
 
         let filters = AuditFilters {
             category: Some(EventCategory::System),
@@ -179,12 +200,20 @@ mod tests {
     async fn query_filter_by_search() {
         let repo = setup().await;
 
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::Rule, "Rule created: Block SSH"))
-            .await
-            .unwrap();
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::Rule, "Rule deleted: Allow DNS"))
-            .await
-            .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::Rule,
+            "Rule created: Block SSH",
+        ))
+        .await
+        .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::Rule,
+            "Rule deleted: Allow DNS",
+        ))
+        .await
+        .unwrap();
 
         let filters = AuditFilters {
             search: Some("SSH".to_string()),
@@ -222,15 +251,27 @@ mod tests {
     async fn count_with_filters() {
         let repo = setup().await;
 
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::Rule, "rule 1"))
-            .await
-            .unwrap();
-        repo.append(&AuditEvent::new(Severity::Error, EventCategory::System, "system error"))
-            .await
-            .unwrap();
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::Rule, "rule 2"))
-            .await
-            .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::Rule,
+            "rule 1",
+        ))
+        .await
+        .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Error,
+            EventCategory::System,
+            "system error",
+        ))
+        .await
+        .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::Rule,
+            "rule 2",
+        ))
+        .await
+        .unwrap();
 
         let filters = AuditFilters {
             severity: Some(Severity::Info),
@@ -244,15 +285,27 @@ mod tests {
     async fn combined_filters() {
         let repo = setup().await;
 
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::Rule, "Rule created: SSH"))
-            .await
-            .unwrap();
-        repo.append(&AuditEvent::new(Severity::Error, EventCategory::Rule, "Rule error: SSH"))
-            .await
-            .unwrap();
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::System, "System SSH"))
-            .await
-            .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::Rule,
+            "Rule created: SSH",
+        ))
+        .await
+        .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Error,
+            EventCategory::Rule,
+            "Rule error: SSH",
+        ))
+        .await
+        .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::System,
+            "System SSH",
+        ))
+        .await
+        .unwrap();
 
         let filters = AuditFilters {
             severity: Some(Severity::Info),
@@ -277,7 +330,13 @@ mod tests {
     async fn batch_append_multiple() {
         let repo = setup().await;
         let events: Vec<AuditEvent> = (0..50)
-            .map(|i| AuditEvent::new(Severity::Info, EventCategory::System, format!("batch {}", i)))
+            .map(|i| {
+                AuditEvent::new(
+                    Severity::Info,
+                    EventCategory::System,
+                    format!("batch {}", i),
+                )
+            })
             .collect();
 
         repo.append_batch(&events).await.unwrap();
@@ -299,10 +358,7 @@ mod tests {
         recent_event.timestamp = now;
         repo.append(&recent_event).await.unwrap();
 
-        let deleted = repo
-            .delete_before(now - Duration::days(5))
-            .await
-            .unwrap();
+        let deleted = repo.delete_before(now - Duration::days(5)).await.unwrap();
         assert_eq!(deleted, 1);
 
         let remaining = repo.count(&AuditFilters::default()).await.unwrap();
@@ -312,9 +368,13 @@ mod tests {
     #[tokio::test]
     async fn delete_before_past_deletes_nothing() {
         let repo = setup().await;
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::System, "event"))
-            .await
-            .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::System,
+            "event",
+        ))
+        .await
+        .unwrap();
 
         let deleted = repo
             .delete_before(Utc::now() - Duration::days(365))
@@ -328,18 +388,34 @@ mod tests {
         let repo = setup().await;
         let now = Utc::now();
 
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::Rule, "rule 1"))
-            .await
-            .unwrap();
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::Rule, "rule 2"))
-            .await
-            .unwrap();
-        repo.append(&AuditEvent::new(Severity::Error, EventCategory::System, "error"))
-            .await
-            .unwrap();
-        repo.append(&AuditEvent::new(Severity::Warning, EventCategory::Connection, "conn"))
-            .await
-            .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::Rule,
+            "rule 1",
+        ))
+        .await
+        .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::Rule,
+            "rule 2",
+        ))
+        .await
+        .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Error,
+            EventCategory::System,
+            "error",
+        ))
+        .await
+        .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Warning,
+            EventCategory::Connection,
+            "conn",
+        ))
+        .await
+        .unwrap();
 
         let stats = repo
             .get_stats(now - Duration::hours(1), now + Duration::hours(1))
@@ -360,16 +436,17 @@ mod tests {
         let repo = setup().await;
         let now = Utc::now();
 
-        repo.append(&AuditEvent::new(Severity::Info, EventCategory::Rule, "event"))
-            .await
-            .unwrap();
+        repo.append(&AuditEvent::new(
+            Severity::Info,
+            EventCategory::Rule,
+            "event",
+        ))
+        .await
+        .unwrap();
 
         // Query a range far in the past
         let stats = repo
-            .get_stats(
-                now - Duration::days(365),
-                now - Duration::days(364),
-            )
+            .get_stats(now - Duration::days(365), now - Duration::days(364))
             .await
             .unwrap();
 

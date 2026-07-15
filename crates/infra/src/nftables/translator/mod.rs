@@ -2,8 +2,8 @@
 //! Translation of domain rules into nftables expressions.
 
 mod criteria;
-mod verdict;
 pub mod interception_chain;
+mod verdict;
 
 use syswall_domain::entities::{Rule, RuleEffect};
 use syswall_domain::value_objects::Direction;
@@ -88,10 +88,7 @@ pub fn translate_rule(rule: &Rule) -> Option<TranslatedRule> {
 
     // Comment with rule UUID for tracking
     let uuid_str = rule.id.as_uuid().to_string();
-    expressions.extend([
-        "comment".to_string(),
-        format!("\"syswall:{}\"", uuid_str),
-    ]);
+    expressions.extend(["comment".to_string(), format!("\"syswall:{}\"", uuid_str)]);
 
     Some(TranslatedRule {
         chains,

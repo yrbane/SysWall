@@ -31,7 +31,9 @@ pub enum DomainError {
 
     /// Anti-lockout triggered: connectivity was lost after a ruleset apply, rules rolled back.
     /// Anti-lockout déclenché : la connectivité a été perdue après un apply, règles annulées.
-    #[error("Anti-lockout triggered: {rolled_back_count} rule change(s) rolled back due to lost connectivity")]
+    #[error(
+        "Anti-lockout triggered: {rolled_back_count} rule change(s) rolled back due to lost connectivity"
+    )]
     AntilockoutTriggered { rolled_back_count: usize },
 }
 
@@ -41,7 +43,9 @@ mod tests {
 
     #[test]
     fn antilockout_triggered_displays_count() {
-        let err = DomainError::AntilockoutTriggered { rolled_back_count: 3 };
+        let err = DomainError::AntilockoutTriggered {
+            rolled_back_count: 3,
+        };
         assert_eq!(
             err.to_string(),
             "Anti-lockout triggered: 3 rule change(s) rolled back due to lost connectivity"

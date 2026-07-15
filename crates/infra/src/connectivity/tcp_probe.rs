@@ -15,11 +15,17 @@ pub struct TcpProbe {
 }
 
 impl TcpProbe {
-    pub fn new(endpoints: Vec<SocketAddr>, per_endpoint_timeout: Duration) -> Result<Self, ProbeError> {
+    pub fn new(
+        endpoints: Vec<SocketAddr>,
+        per_endpoint_timeout: Duration,
+    ) -> Result<Self, ProbeError> {
         if endpoints.is_empty() {
             return Err(ProbeError::Configuration("empty endpoint list".into()));
         }
-        Ok(Self { endpoints, per_endpoint_timeout })
+        Ok(Self {
+            endpoints,
+            per_endpoint_timeout,
+        })
     }
 }
 
@@ -30,9 +36,9 @@ impl ConnectivityProbe for TcpProbe {
             let timeout = self.per_endpoint_timeout;
             async move {
                 match tokio::time::timeout(timeout, TcpStream::connect(addr)).await {
-                    Ok(Ok(_)) => true,                                       // Connected.
-                    Ok(Err(e)) if is_reachable_error(&e) => true,            // Refused/Reset = network OK.
-                    Ok(Err(_)) | Err(_) => false,                            // Other or timeout.
+                    Ok(Ok(_)) => true,                            // Connected.
+                    Ok(Err(e)) if is_reachable_error(&e) => true, // Refused/Reset = network OK.
+                    Ok(Err(_)) | Err(_) => false,                 // Other or timeout.
                 }
             }
         });

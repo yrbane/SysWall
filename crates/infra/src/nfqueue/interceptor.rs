@@ -47,7 +47,11 @@ pub struct NfqueueInterceptor {
 
 impl NfqueueInterceptor {
     pub fn new(queue_num: u16, max_queued: u32, overflow: OverflowPolicy) -> Self {
-        Self { queue_num, max_queued, overflow }
+        Self {
+            queue_num,
+            max_queued,
+            overflow,
+        }
     }
 }
 
@@ -230,7 +234,13 @@ mod tests {
 
     #[test]
     fn overflow_to_nfq_verdict_mapping() {
-        assert_eq!(overflow_to_nfq_verdict(OverflowPolicy::Accept), nfq::Verdict::Accept);
-        assert_eq!(overflow_to_nfq_verdict(OverflowPolicy::Block), nfq::Verdict::Drop);
+        assert_eq!(
+            overflow_to_nfq_verdict(OverflowPolicy::Accept),
+            nfq::Verdict::Accept
+        );
+        assert_eq!(
+            overflow_to_nfq_verdict(OverflowPolicy::Block),
+            nfq::Verdict::Drop
+        );
     }
 }

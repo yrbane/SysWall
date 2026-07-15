@@ -100,9 +100,11 @@ impl AuditService {
                 EventCategory::System,
                 format!("Firewall status changed: enabled={}", status.enabled),
             )),
-            DomainEvent::SystemError { message, severity } => {
-                Some(AuditEvent::new(*severity, EventCategory::System, message.clone()))
-            }
+            DomainEvent::SystemError { message, severity } => Some(AuditEvent::new(
+                *severity,
+                EventCategory::System,
+                message.clone(),
+            )),
             // Anti-lockout est déjà audité directement par run_guard_loop — pas de doublon ici.
             // Anti-lockout is already audited directly by run_guard_loop — no duplicate here.
             DomainEvent::AntilockoutTriggered { .. } => None,

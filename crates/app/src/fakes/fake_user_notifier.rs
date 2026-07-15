@@ -30,10 +30,7 @@ impl FakeUserNotifier {
 
 #[async_trait]
 impl UserNotifier for FakeUserNotifier {
-    async fn notify_decision_required(
-        &self,
-        request: &PendingDecision,
-    ) -> Result<(), DomainError> {
+    async fn notify_decision_required(&self, request: &PendingDecision) -> Result<(), DomainError> {
         self.decision_notifications
             .lock()
             .unwrap()

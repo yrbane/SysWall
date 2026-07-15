@@ -28,8 +28,9 @@ impl Database {
     /// Open an in-memory database (for testing).
     /// Ouvre une base de données en mémoire (pour les tests).
     pub fn open_in_memory() -> Result<Self, DomainError> {
-        let conn = Connection::open_in_memory()
-            .map_err(|e| DomainError::Infrastructure(format!("Failed to open in-memory DB: {}", e)))?;
+        let conn = Connection::open_in_memory().map_err(|e| {
+            DomainError::Infrastructure(format!("Failed to open in-memory DB: {}", e))
+        })?;
 
         Self::configure(&conn)?;
         Self::migrate(&conn)?;
@@ -44,7 +45,7 @@ impl Database {
             "PRAGMA journal_mode = WAL;
              PRAGMA busy_timeout = 5000;
              PRAGMA foreign_keys = ON;
-             PRAGMA synchronous = NORMAL;"
+             PRAGMA synchronous = NORMAL;",
         )
         .map_err(|e| DomainError::Infrastructure(format!("Failed to configure DB: {}", e)))
     }
@@ -102,7 +103,7 @@ impl Database {
 
             CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_events(timestamp);
             CREATE INDEX IF NOT EXISTS idx_audit_severity ON audit_events(severity);
-            CREATE INDEX IF NOT EXISTS idx_audit_category ON audit_events(category);"
+            CREATE INDEX IF NOT EXISTS idx_audit_category ON audit_events(category);",
         )
         .map_err(|e| DomainError::Infrastructure(format!("Migration failed: {}", e)))
     }

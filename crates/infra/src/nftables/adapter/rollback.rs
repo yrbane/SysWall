@@ -30,7 +30,10 @@ impl NftablesFirewallAdapter {
     /// Attempt to rollback to a previous state.
     pub(super) async fn rollback(&self, state: &RollbackState) {
         perform_rollback_static(state, &self.config).await;
-        *self.nftables_synced.lock().expect("Mutex jamais empoisonné / never poisoned") = false;
+        *self
+            .nftables_synced
+            .lock()
+            .expect("Mutex jamais empoisonné / never poisoned") = false;
     }
 }
 

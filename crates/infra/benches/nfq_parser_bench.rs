@@ -10,17 +10,19 @@
 //! The parser is the hot path: called once per packet captured by NFQUEUE.
 //! Target: >= 1 microsecond / packet (~ 1M peak parsed packets/s).
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use syswall_infra::nfqueue::parser::parse_packet;
 
 /// Construit un paquet IPv4 + TCP SYN minimaliste.
 /// Builds a minimal IPv4 + TCP SYN packet.
 fn ipv4_tcp_syn() -> Vec<u8> {
     let mut buffer = Vec::new();
-    let builder = etherparse::PacketBuilder::ipv4([10, 0, 0, 1], [1, 2, 3, 4], 64)
-        .tcp(12345, 443, 0, 1024);
+    let builder =
+        etherparse::PacketBuilder::ipv4([10, 0, 0, 1], [1, 2, 3, 4], 64).tcp(12345, 443, 0, 1024);
     let payload: &[u8] = &[];
-    builder.write(&mut buffer, payload).expect("etherparse builder");
+    builder
+        .write(&mut buffer, payload)
+        .expect("etherparse builder");
     buffer
 }
 
@@ -30,7 +32,9 @@ fn ipv4_udp() -> Vec<u8> {
     let mut buffer = Vec::new();
     let builder = etherparse::PacketBuilder::ipv4([10, 0, 0, 1], [1, 1, 1, 1], 64).udp(54321, 53);
     let payload: &[u8] = b"\x00\x00\x01\x00\x00\x01\x00\x00";
-    builder.write(&mut buffer, payload).expect("etherparse builder");
+    builder
+        .write(&mut buffer, payload)
+        .expect("etherparse builder");
     buffer
 }
 
@@ -45,7 +49,9 @@ fn ipv6_udp() -> Vec<u8> {
     )
     .udp(12345, 53);
     let payload: &[u8] = b"\x12\x34";
-    builder.write(&mut buffer, payload).expect("etherparse builder");
+    builder
+        .write(&mut buffer, payload)
+        .expect("etherparse builder");
     buffer
 }
 

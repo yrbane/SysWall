@@ -59,11 +59,20 @@ pub async fn get_process_details(pid: u32) -> Result<ProcessDetails, String> {
         } else if let Some(val) = line.strip_prefix("State:") {
             state = val.trim().to_string();
         } else if let Some(val) = line.strip_prefix("Uid:") {
-            uid = val.split_whitespace().next().and_then(|v| v.parse().ok()).unwrap_or(0);
+            uid = val
+                .split_whitespace()
+                .next()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
         } else if let Some(val) = line.strip_prefix("Threads:") {
             threads = val.trim().parse().unwrap_or(0);
         } else if let Some(val) = line.strip_prefix("VmRSS:") {
-            rss_pages = val.trim().split_whitespace().next().and_then(|v| v.parse().ok()).unwrap_or(0);
+            rss_pages = val
+                .trim()
+                .split_whitespace()
+                .next()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
         }
     }
 
@@ -76,7 +85,12 @@ pub async fn get_process_details(pid: u32) -> Result<ProcessDetails, String> {
     // Ligne de commande
     // Command line
     let cmdline = std::fs::read(proc_path.join("cmdline"))
-        .map(|b| String::from_utf8_lossy(&b).replace('\0', " ").trim().to_string())
+        .map(|b| {
+            String::from_utf8_lossy(&b)
+                .replace('\0', " ")
+                .trim()
+                .to_string()
+        })
         .unwrap_or_default();
 
     // Répertoire de travail
@@ -199,10 +213,7 @@ pub async fn read_icon(path: String) -> Result<String, String> {
 
     // Vérifier que c'est bien un fichier d'icône (sécurité)
     // Verify it's an icon file (security)
-    let ext = file_path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("");
+    let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
     let mime = match ext {
         "svg" => "image/svg+xml",

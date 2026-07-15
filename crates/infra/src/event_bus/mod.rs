@@ -50,7 +50,9 @@ impl TokioBroadcastEventBus {
             loop {
                 tokio::time::sleep(window).await;
                 let events: Vec<syswall_domain::entities::Connection> = {
-                    let mut buf = buf_clone.lock().expect("Mutex jamais empoisonné / never poisoned");
+                    let mut buf = buf_clone
+                        .lock()
+                        .expect("Mutex jamais empoisonné / never poisoned");
                     buf.drain().map(|(_, conn)| conn).collect()
                 };
                 for conn in events {
@@ -107,10 +109,7 @@ mod tests {
         Connection {
             id: ConnectionId::new(),
             protocol: Protocol::Tcp,
-            source: SocketAddress::new(
-                "192.168.1.100".parse().unwrap(),
-                Port::new(45000).unwrap(),
-            ),
+            source: SocketAddress::new("192.168.1.100".parse().unwrap(), Port::new(45000).unwrap()),
             destination: SocketAddress::new(
                 "93.184.216.34".parse().unwrap(),
                 Port::new(443).unwrap(),
@@ -155,9 +154,7 @@ mod tests {
     #[tokio::test]
     async fn publish_without_subscribers_does_not_error() {
         let bus = TokioBroadcastEventBus::new(128);
-        let result = bus
-            .publish(DomainEvent::RuleDeleted(RuleId::new()))
-            .await;
+        let result = bus.publish(DomainEvent::RuleDeleted(RuleId::new())).await;
         assert!(result.is_ok());
     }
 
@@ -177,8 +174,7 @@ mod tests {
 
     #[tokio::test]
     async fn merge_duplicate_connection_events() {
-        let bus =
-            TokioBroadcastEventBus::with_merge_window(128, Duration::from_millis(50));
+        let bus = TokioBroadcastEventBus::with_merge_window(128, Duration::from_millis(50));
         let mut rx = bus.subscribe();
 
         let conn = test_connection();
@@ -210,8 +206,7 @@ mod tests {
 
     #[tokio::test]
     async fn non_connection_events_pass_through_with_merge() {
-        let bus =
-            TokioBroadcastEventBus::with_merge_window(128, Duration::from_millis(50));
+        let bus = TokioBroadcastEventBus::with_merge_window(128, Duration::from_millis(50));
         let mut rx = bus.subscribe();
 
         // Les événements non-ConnectionDetected passent directement
@@ -226,8 +221,7 @@ mod tests {
 
     #[tokio::test]
     async fn merge_keeps_different_connections_separate() {
-        let bus =
-            TokioBroadcastEventBus::with_merge_window(128, Duration::from_millis(50));
+        let bus = TokioBroadcastEventBus::with_merge_window(128, Duration::from_millis(50));
         let mut rx = bus.subscribe();
 
         let conn1 = test_connection();

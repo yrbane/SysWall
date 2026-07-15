@@ -11,11 +11,11 @@ use syswall_domain::entities::{
 };
 use syswall_domain::errors::DomainError;
 use syswall_domain::events::{DefaultPolicy, DomainEvent};
+use syswall_domain::ports::interception::PacketVerdict;
 use syswall_domain::ports::{
     AuditRepository, DecisionRepository, EventBus, PendingDecisionRepository, RuleRepository,
     UserNotifier,
 };
-use syswall_domain::ports::interception::PacketVerdict;
 use syswall_domain::services::PolicyEngine;
 
 use crate::commands::RespondToDecisionCommand;
@@ -221,10 +221,7 @@ impl LearningService {
             .iter()
             .find(|p| p.id == cmd.pending_decision_id)
             .ok_or_else(|| {
-                DomainError::NotFound(format!(
-                    "PendingDecision {:?}",
-                    cmd.pending_decision_id
-                ))
+                DomainError::NotFound(format!("PendingDecision {:?}", cmd.pending_decision_id))
             })?;
 
         if pending.status != PendingDecisionStatus::Pending {
@@ -310,10 +307,7 @@ impl LearningService {
 
     /// Attendre le verdict du broadcast pour une PendingDecision donnée.
     /// Wait for the broadcast verdict for a given PendingDecision.
-    async fn wait_for_verdict(
-        &self,
-        id: PendingDecisionId,
-    ) -> Result<PacketVerdict, DomainError> {
+    async fn wait_for_verdict(&self, id: PendingDecisionId) -> Result<PacketVerdict, DomainError> {
         use std::time::Duration as StdDuration;
 
         let mut rx = self.verdict_broadcasts.subscribe(id).await;
@@ -334,22 +328,21 @@ impl LearningService {
             Err(err) => {
                 // Audit dedie selon le type d'erreur.
                 // Dedicated audit per error kind.
-                let event = AuditEvent::new(
-                    err.severity(),
-                    EventCategory::Decision,
-                    err.audit_message(),
-                )
-                .with_metadata("decision_id", id.as_uuid().to_string())
-                .with_metadata("wait_error", err.kind_label());
+                let event =
+                    AuditEvent::new(err.severity(), EventCategory::Decision, err.audit_message())
+                        .with_metadata("decision_id", id.as_uuid().to_string())
+                        .with_metadata("wait_error", err.kind_label());
                 let _ = self.audit_repo.append(&event).await;
 
                 // Mapping d'action : timeout suit la config, autres erreurs = fail-safe Drop.
                 // Action mapping: timeout follows config, other errors = fail-safe Drop.
                 Ok(match err {
-                    VerdictWaitError::Timeout => match self.config.default_timeout_action.as_str() {
-                        "allow" => PacketVerdict::Accept,
-                        _ => PacketVerdict::Drop,
-                    },
+                    VerdictWaitError::Timeout => {
+                        match self.config.default_timeout_action.as_str() {
+                            "allow" => PacketVerdict::Accept,
+                            _ => PacketVerdict::Drop,
+                        }
+                    }
                     VerdictWaitError::ChannelClosed | VerdictWaitError::ChannelLagged { .. } => {
                         PacketVerdict::Drop
                     }
@@ -360,10 +353,7 @@ impl LearningService {
 
     /// Gérer une connexion en attente de décision (debounce + wait).
     /// Handle a connection pending a user decision (debounce + wait).
-    async fn pending_verdict_for(
-        &self,
-        conn: &Connection,
-    ) -> Result<PacketVerdict, DomainError> {
+    async fn pending_verdict_for(&self, conn: &Connection) -> Result<PacketVerdict, DomainError> {
         // Si le sous-système d'apprentissage est désactivé, retomber sur la default policy.
         // If the learning subsystem is disabled, fall back to the default policy.
         if !self.config.enabled {
@@ -440,17 +430,14 @@ impl LearningService {
 
 #[async_trait]
 impl syswall_domain::ports::interception::PacketDecisionHandler for LearningService {
-    async fn decide(
-        &self,
-        connection: &Connection,
-    ) -> Result<PacketVerdict, DomainError> {
+    async fn decide(&self, connection: &Connection) -> Result<PacketVerdict, DomainError> {
         let rules = self.rule_repo.list_enabled_ordered().await?;
         let evaluation = PolicyEngine::evaluate(connection, &rules, self.default_policy);
         match evaluation.verdict {
             ConnectionVerdict::Allowed => Ok(PacketVerdict::Accept),
-            ConnectionVerdict::Blocked | ConnectionVerdict::Ignored | ConnectionVerdict::Unknown => {
-                Ok(PacketVerdict::Drop)
-            }
+            ConnectionVerdict::Blocked
+            | ConnectionVerdict::Ignored
+            | ConnectionVerdict::Unknown => Ok(PacketVerdict::Drop),
             ConnectionVerdict::PendingDecision => self.pending_verdict_for(connection).await,
         }
     }
@@ -476,7 +463,10 @@ mod tests {
     #[test]
     fn verdict_wait_error_kind_labels() {
         assert_eq!(VerdictWaitError::Timeout.kind_label(), "timeout");
-        assert_eq!(VerdictWaitError::ChannelClosed.kind_label(), "channel_closed");
+        assert_eq!(
+            VerdictWaitError::ChannelClosed.kind_label(),
+            "channel_closed"
+        );
         assert_eq!(
             VerdictWaitError::ChannelLagged { missed: 1 }.kind_label(),
             "channel_lagged"
@@ -640,8 +630,8 @@ mod handler_tests {
     use std::time::Duration;
     use syswall_domain::entities::{
         Connection, ConnectionId, ConnectionState, ConnectionVerdict as ConnVerdict,
-        DecisionAction, DecisionGranularity, ProcessInfo, RuleCriteria,
-        RuleEffect, RuleId, RuleScope, RuleSource, SystemUser,
+        DecisionAction, DecisionGranularity, ProcessInfo, RuleCriteria, RuleEffect, RuleId,
+        RuleScope, RuleSource, SystemUser,
     };
     use syswall_domain::events::DefaultPolicy;
     use syswall_domain::ports::interception::{PacketDecisionHandler, PacketVerdict};
@@ -653,14 +643,8 @@ mod handler_tests {
         Connection {
             id: ConnectionId::new(),
             protocol: Protocol::Tcp,
-            source: SocketAddress::new(
-                "10.0.0.1".parse().unwrap(),
-                Port::new(5000).unwrap(),
-            ),
-            destination: SocketAddress::new(
-                "8.8.8.8".parse().unwrap(),
-                Port::new(443).unwrap(),
-            ),
+            source: SocketAddress::new("10.0.0.1".parse().unwrap(), Port::new(5000).unwrap()),
+            destination: SocketAddress::new("8.8.8.8".parse().unwrap(), Port::new(443).unwrap()),
             direction: Direction::Outbound,
             state: ConnectionState::New,
             process: Some(ProcessInfo {
@@ -771,7 +755,10 @@ mod handler_tests {
         tokio::time::sleep(Duration::from_millis(1)).await;
 
         let pds = pending_repo.snapshot_pending().await;
-        let pd = pds.into_iter().next().expect("PendingDecision devrait exister");
+        let pd = pds
+            .into_iter()
+            .next()
+            .expect("PendingDecision devrait exister");
 
         let cmd = RespondToDecisionCommand {
             pending_decision_id: pd.id,
@@ -807,7 +794,10 @@ mod handler_tests {
         assert_eq!(pending_repo.count_pending().await, 1);
 
         let pds = pending_repo.snapshot_pending().await;
-        let pd = pds.into_iter().next().expect("PendingDecision devrait exister");
+        let pd = pds
+            .into_iter()
+            .next()
+            .expect("PendingDecision devrait exister");
 
         let cmd = RespondToDecisionCommand {
             pending_decision_id: pd.id,
@@ -862,7 +852,10 @@ mod handler_tests {
         tokio::time::sleep(Duration::from_millis(1)).await;
 
         let pds = pending_repo.snapshot_pending().await;
-        let pd = pds.into_iter().next().expect("PendingDecision devrait exister");
+        let pd = pds
+            .into_iter()
+            .next()
+            .expect("PendingDecision devrait exister");
 
         let cmd = RespondToDecisionCommand {
             pending_decision_id: pd.id,
@@ -887,7 +880,10 @@ mod handler_tests {
         tokio::time::sleep(Duration::from_millis(1)).await;
 
         let pds = pending_repo.snapshot_pending().await;
-        let pd = pds.into_iter().next().expect("PendingDecision devrait exister");
+        let pd = pds
+            .into_iter()
+            .next()
+            .expect("PendingDecision devrait exister");
 
         let cmd = RespondToDecisionCommand {
             pending_decision_id: pd.id,
@@ -914,7 +910,10 @@ mod handler_tests {
         tokio::time::sleep(Duration::from_millis(1)).await;
 
         let pds = pending_repo.snapshot_pending().await;
-        let pd = pds.into_iter().next().expect("PendingDecision devrait exister");
+        let pd = pds
+            .into_iter()
+            .next()
+            .expect("PendingDecision devrait exister");
 
         // L'utilisateur differe pour 60 secondes.
         // User defers for 60 seconds.
@@ -937,16 +936,24 @@ mod handler_tests {
 
         // Verifie qu'aucune nouvelle pending n'a ete creee (dedup_key snoozed).
         let new_pds = pending_repo.snapshot_pending().await;
-        assert_eq!(new_pds.len(), 0, "snooze doit empecher la creation d'une nouvelle pending");
+        assert_eq!(
+            new_pds.len(),
+            0,
+            "snooze doit empecher la creation d'une nouvelle pending"
+        );
 
         // Audit log doit contenir les deux events Defer.
         let events = audit.snapshot().await;
         assert!(
-            events.iter().any(|e| e.description.contains("decision deferred")),
+            events
+                .iter()
+                .any(|e| e.description.contains("decision deferred")),
             "audit doit contenir l'event resolve Defer"
         );
         assert!(
-            events.iter().any(|e| e.description.contains("dedup_key snoozed")),
+            events
+                .iter()
+                .any(|e| e.description.contains("dedup_key snoozed")),
             "audit doit contenir l'event drop sur snooze actif"
         );
     }

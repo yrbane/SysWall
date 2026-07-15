@@ -16,6 +16,10 @@ All notable changes documented here.
 - **Installation en une seule commande** : `system/install.sh` détecte la distribution (`/etc/os-release`), refuse proprement les systèmes sans systemd, signale le paquet natif sur la famille Arch, puis **installe ET démarre** le service (`systemctl restart` + statut). / One-command install: `install.sh` detects the distribution, cleanly refuses non-systemd systems, hints the native package on the Arch family, then installs AND starts the service.
 - **Garde-fou CI** `system/tests/check-service-config.sh` : vérifie la cohérence unit/installeurs (`SYSWALL_CONFIG`, utilisateur `syswall`, détection distro, démarrage du service). Câblé au job `hardening-check`. / CI guard test asserting unit/installer consistency, wired into the `hardening-check` job.
 
+### Changed / Modifie
+
+- **Reformatage `cargo fmt --all`** sur l'ensemble du workspace (rustfmt edition 2024) : le formatage avait dérivé et faisait échouer le job `lint` de la CI. Aucune logique modifiée. / Workspace-wide `cargo fmt --all` (rustfmt edition 2024): formatting had drifted and was failing the CI `lint` job. No logic changed.
+
 ## [0.3.0] - 2026-05-05
 
 Version de stabilisation post-V0.2 : finition technique, hardening CI, polish.

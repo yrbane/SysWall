@@ -7,7 +7,7 @@
 //! Cible : sub-microseconde, le formatage de chaine est le seul cout.
 //! Target: sub-microsecond, string formatting is the only cost.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use syswall_app::services::learning_service::LearningService;
 use syswall_domain::entities::ConnectionSnapshot;
 use syswall_domain::value_objects::*;

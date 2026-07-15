@@ -137,13 +137,11 @@ impl AuditRepository for FakeAuditRepository {
         for event in events.iter() {
             if event.timestamp >= from && event.timestamp <= to {
                 total += 1;
-                let cat_str =
-                    serde_json::to_string(&event.category).unwrap_or_default();
+                let cat_str = serde_json::to_string(&event.category).unwrap_or_default();
                 let cat_str = cat_str.trim_matches('"').to_string();
                 *by_category.entry(cat_str).or_insert(0) += 1;
 
-                let sev_str =
-                    serde_json::to_string(&event.severity).unwrap_or_default();
+                let sev_str = serde_json::to_string(&event.severity).unwrap_or_default();
                 let sev_str = sev_str.trim_matches('"').to_string();
                 *by_severity.entry(sev_str).or_insert(0) += 1;
             }

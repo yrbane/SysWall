@@ -21,9 +21,6 @@ pub trait EventBus: Send + Sync {
 /// Notifie l'interface utilisateur qu'une décision est requise (non bloquant).
 #[async_trait]
 pub trait UserNotifier: Send + Sync {
-    async fn notify_decision_required(
-        &self,
-        request: &PendingDecision,
-    ) -> Result<(), DomainError>;
+    async fn notify_decision_required(&self, request: &PendingDecision) -> Result<(), DomainError>;
     async fn notify(&self, notification: &Notification) -> Result<(), DomainError>;
 }

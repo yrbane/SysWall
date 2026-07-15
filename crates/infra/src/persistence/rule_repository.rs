@@ -37,7 +37,9 @@ impl SqliteRuleRepository {
 
         Ok(Rule {
             id: RuleId::from_uuid(
-                id_str.parse().expect("UUID stocké par notre code / stored by our code"),
+                id_str
+                    .parse()
+                    .expect("UUID stocké par notre code / stored by our code"),
             ),
             name,
             priority: RulePriority::new(priority),
@@ -144,7 +146,9 @@ impl RuleRepository for SqliteRuleRepository {
         tokio::task::spawn_blocking(move || {
             db.with_writer(|conn| {
                 conn.execute("DELETE FROM rules WHERE id = ?1", rusqlite::params![id_str])
-                    .map_err(|e| DomainError::Infrastructure(format!("Failed to delete rule: {}", e)))?;
+                    .map_err(|e| {
+                        DomainError::Infrastructure(format!("Failed to delete rule: {}", e))
+                    })?;
                 Ok(())
             })
         })

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use syswall_domain::ports::connectivity::{ConnectivityProbe, ProbeError, ProbeOutcome};
 
@@ -25,7 +25,10 @@ impl FakeConnectivityProbe {
     }
 
     pub fn with_sequence(seq: Vec<Result<ProbeOutcome, ProbeError>>) -> Self {
-        assert!(!seq.is_empty(), "FakeConnectivityProbe requires at least one outcome");
+        assert!(
+            !seq.is_empty(),
+            "FakeConnectivityProbe requires at least one outcome"
+        );
         Self {
             sequence: Arc::new(seq),
             cursor: Arc::new(AtomicUsize::new(0)),

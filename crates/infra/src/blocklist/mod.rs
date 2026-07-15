@@ -78,7 +78,10 @@ impl FileBlocklistRepository {
 
 impl BlocklistChecker for FileBlocklistRepository {
     fn is_blocked_domain(&self, domain: &str) -> bool {
-        let state = self.state.read().expect("RwLock jamais empoisonné / never poisoned");
+        let state = self
+            .state
+            .read()
+            .expect("RwLock jamais empoisonné / never poisoned");
         let lower = domain.to_lowercase();
         // Vérification exacte et par suffixe (sous-domaine)
         // Exact match and suffix match (subdomain)
@@ -98,12 +101,18 @@ impl BlocklistChecker for FileBlocklistRepository {
     }
 
     fn is_blocked_ip(&self, ip: IpAddr) -> bool {
-        let state = self.state.read().expect("RwLock jamais empoisonné / never poisoned");
+        let state = self
+            .state
+            .read()
+            .expect("RwLock jamais empoisonné / never poisoned");
         state.ips.contains(&ip)
     }
 
     fn list_blocklists(&self) -> Vec<Blocklist> {
-        let state = self.state.read().expect("RwLock jamais empoisonné / never poisoned");
+        let state = self
+            .state
+            .read()
+            .expect("RwLock jamais empoisonné / never poisoned");
         state.lists.clone()
     }
 
@@ -127,7 +136,10 @@ impl BlocklistChecker for FileBlocklistRepository {
         let mut lists = Vec::new();
 
         let entries = std::fs::read_dir(&self.directory).map_err(|e| {
-            DomainError::Infrastructure(format!("Impossible de lire le répertoire blocklists: {}", e))
+            DomainError::Infrastructure(format!(
+                "Impossible de lire le répertoire blocklists: {}",
+                e
+            ))
         })?;
 
         for entry in entries.flatten() {
@@ -168,7 +180,10 @@ impl BlocklistChecker for FileBlocklistRepository {
             lists.len()
         );
 
-        let mut state = self.state.write().expect("RwLock jamais empoisonné / never poisoned");
+        let mut state = self
+            .state
+            .write()
+            .expect("RwLock jamais empoisonné / never poisoned");
         state.domains = all_domains;
         state.ips = all_ips;
         state.lists = lists;
