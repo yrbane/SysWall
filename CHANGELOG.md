@@ -20,6 +20,10 @@ All notable changes documented here.
 
 - **Reformatage `cargo fmt --all`** sur l'ensemble du workspace (rustfmt edition 2024) : le formatage avait dérivé et faisait échouer le job `lint` de la CI. Aucune logique modifiée. / Workspace-wide `cargo fmt --all` (rustfmt edition 2024): formatting had drifted and was failing the CI `lint` job. No logic changed.
 
+### Security / Securite
+
+- **`npm audit fix`** sur l'UI : corrige 3 vulnérabilités *high* et 2 *moderate* de la chaîne d'outils front (@sveltejs/kit, vite, svelte, postcss, cookie, devalue), transitives et sans rupture (semver). Débloque le job `audit` de la CI. / `npm audit fix` on the UI: fixes 3 high and 2 moderate front-end toolchain advisories, transitive and non-breaking. Unblocks the CI `audit` job.
+
 ## [0.3.0] - 2026-05-05
 
 Version de stabilisation post-V0.2 : finition technique, hardening CI, polish.
