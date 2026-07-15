@@ -19,6 +19,8 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Install protoc (syswall-proto / prost-build)
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - run: cargo fmt --all -- --check
       # ui (crate Tauri) exclu: depend de Tauri qui a ses propres conventions de lint, hors scope sous-projet B.
       - name: cargo clippy (workspace, all targets, deny warnings)
@@ -31,7 +33,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace
+      - name: Install protoc (syswall-proto / prost-build)
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      # ui exclu : crate Tauri exigeant les libs systeme GTK/WebKit absentes des
+      # runners (coherent avec le job lint qui l'exclut deja de clippy).
+      # ui excluded: Tauri crate needing GTK/WebKit system libs absent from runners
+      # (consistent with the lint job already excluding it from clippy).
+      - run: cargo test --workspace --exclude ui
 
   ui:
     name: UI (check + build)
@@ -54,7 +62,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo install cargo-audit --locked
-      - run: cargo audit
+      # quick-xml (RUSTSEC-2026-0194/0195) : tire par plist (parsing .plist Apple),
+      # fige a ^0.38 par tauri et absent du build Linux -> non atteignable ici.
+      # A retirer des qu'un bump de tauri permet quick-xml >= 0.41.
+      # quick-xml: pulled by plist (Apple .plist parsing), pinned to ^0.38 by tauri and
+      # absent from the Linux build -> not reachable here. Drop once a tauri bump allows
+      # quick-xml >= 0.41.
+      - run: cargo audit --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195
       - run: cd crates/ui && npm audit --audit-level=high
 
   deny:
@@ -84,6 +98,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Install protoc (syswall-proto / prost-build)
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Run gRPC integration tests
         env:
           SYSWALL_TEST_GRPC: '1'
@@ -96,6 +112,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Install protoc (syswall-proto / prost-build)
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Install kernel modules (nfnetlink_queue)
         run: |
           sudo modprobe nfnetlink_queue || echo "module load may fail in CI runner"
@@ -111,6 +129,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
+      - name: Install protoc (syswall-proto / prost-build)
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz --locked
       # libFuzzer écrit dans le 1er répertoire : corpus jetable d'abord, seeds versionnés en lecture seule ensuite.

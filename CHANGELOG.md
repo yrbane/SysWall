@@ -25,6 +25,11 @@ All notable changes documented here.
 
 - **`npm audit fix`** sur l'UI : corrige 3 vulnérabilités *high* et 2 *moderate* de la chaîne d'outils front (@sveltejs/kit, vite, svelte, postcss, cookie, devalue), transitives et sans rupture (semver). Débloque le job `audit` de la CI. / `npm audit fix` on the UI: fixes 3 high and 2 moderate front-end toolchain advisories, transitive and non-breaking. Unblocks the CI `audit` job.
 - **`crossbeam-epoch` 0.9.18 → 0.9.20** (RUSTSEC-2026-0204, déréférencement de pointeur invalide) : dépendance transitive de dev (criterion → rayon), corrigée par `cargo update`. Débloque les jobs `deny` et `audit`. / `crossbeam-epoch` bumped for RUSTSEC-2026-0204; transitive dev dependency, fixed via `cargo update`. Unblocks the `deny` and `audit` jobs.
+- **`lru` 0.12 → 0.16** (RUSTSEC-2026-0002, soundness `IterMut`) : dépendance directe d'`infra` (cache de processus/DNS), API compatible (`new`/`get`/`put`/`pop`). SysWall n'utilisait pas `iter_mut` mais le bump supprime l'advisory à la racine. / `lru` bumped for RUSTSEC-2026-0002; direct dependency of `infra`, API-compatible.
+
+### CI
+
+- **Réparation de la CI** (rouge depuis plusieurs mois pour des raisons d'infra) : installation de `protoc` dans les jobs qui compilent `syswall-proto` (lint, test, gRPC, nfqueue, fuzz), exclusion de `ui` du `cargo test --workspace` (libs GTK/WebKit absentes des runners, comme clippy), et `cargo audit --ignore` des advisories `quick-xml` (RUSTSEC-2026-0194/0195 — transitives macOS-only via plist/tauri, non atteignables sous Linux). / CI repaired: `protoc` installed where `syswall-proto` is built, `ui` excluded from `cargo test`, and `quick-xml` advisories ignored (macOS-only, unreachable on Linux).
 
 ## [0.3.0] - 2026-05-05
 
