@@ -1,5 +1,8 @@
 use std::collections::HashSet;
+use std::ffi::CString;
 use std::sync::Arc;
+
+use nix::unistd::{Uid, User, getgrouplist};
 use tokio::sync::mpsc;
 use tonic::{Request, Status, service::Interceptor};
 
@@ -14,12 +17,49 @@ pub struct PeerCredentials {
     pub pid: i32,
 }
 
+/// Résout l'ensemble des gid (primaire + supplémentaires) d'un utilisateur.
+/// Injectable pour tester l'appartenance aux groupes sans dépendre du NSS réel.
+/// Resolves the set of gids (primary + supplementary) of a user.
+/// Injectable so group membership can be tested without touching the real NSS.
+type UserGidsResolver = Arc<dyn Fn(u32) -> HashSet<u32> + Send + Sync>;
+
+/// Résolveur de production : interroge le NSS (getpwuid + getgrouplist).
+/// Production resolver: queries NSS (getpwuid + getgrouplist).
+fn nss_user_gids(uid: u32) -> HashSet<u32> {
+    let mut gids = HashSet::new();
+    if let Ok(Some(user)) = User::from_uid(Uid::from_raw(uid)) {
+        gids.insert(user.gid.as_raw());
+        if let Ok(cname) = CString::new(user.name.as_bytes()) {
+            if let Ok(groups) = getgrouplist(&cname, user.gid) {
+                gids.extend(groups.into_iter().map(|g| g.as_raw()));
+            }
+        }
+    }
+    gids
+}
+
 /// Allowed identities for gRPC calls.
 /// Identités autorisées pour les appels gRPC.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PeerAuthPolicy {
     pub allowed_uids: HashSet<u32>,
     pub allowed_gids: HashSet<u32>,
+    // SO_PEERCRED ne renvoie que le gid *primaire* ; pour autoriser un membre du
+    // groupe syswall qui ne l'a pas en gid primaire (cas d'une UI lancee normalement,
+    // gid primaire = groupe personnel), on consulte aussi ses groupes supplementaires.
+    // SO_PEERCRED only reports the *primary* gid; to allow a syswall group member that
+    // does not have it as primary gid (a UI launched normally, primary gid = personal
+    // group), we also consult its supplementary groups.
+    user_gids: UserGidsResolver,
+}
+
+impl std::fmt::Debug for PeerAuthPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PeerAuthPolicy")
+            .field("allowed_uids", &self.allowed_uids)
+            .field("allowed_gids", &self.allowed_gids)
+            .finish_non_exhaustive()
+    }
 }
 
 impl PeerAuthPolicy {
@@ -27,11 +67,35 @@ impl PeerAuthPolicy {
         Self {
             allowed_uids,
             allowed_gids,
+            user_gids: Arc::new(nss_user_gids),
+        }
+    }
+
+    /// Variante avec résolveur de groupes injecté (pour les tests unitaires).
+    /// Variant with an injected group resolver (for unit tests).
+    pub fn with_resolver(
+        allowed_uids: HashSet<u32>,
+        allowed_gids: HashSet<u32>,
+        user_gids: UserGidsResolver,
+    ) -> Self {
+        Self {
+            allowed_uids,
+            allowed_gids,
+            user_gids,
         }
     }
 
     pub fn permits(&self, creds: &PeerCredentials) -> bool {
-        self.allowed_uids.contains(&creds.uid) || self.allowed_gids.contains(&creds.gid)
+        // Chemins rapides : uid explicitement autorisé, ou gid primaire autorisé.
+        // Fast paths: explicitly allowed uid, or allowed primary gid.
+        if self.allowed_uids.contains(&creds.uid) || self.allowed_gids.contains(&creds.gid) {
+            return true;
+        }
+        // Sinon : membre *supplémentaire* d'un groupe autorisé (ex. utilisateur dans le
+        // groupe syswall sans l'avoir en gid primaire).
+        // Otherwise: *supplementary* member of an allowed group (e.g. a user in the
+        // syswall group without it as primary gid).
+        !self.allowed_gids.is_disjoint(&(self.user_gids)(creds.uid))
     }
 }
 
@@ -131,9 +195,12 @@ mod tests {
     #[test]
     fn unprivileged_user_denied_and_audited() {
         let (tx, mut rx) = audit_pair();
-        let policy = Arc::new(PeerAuthPolicy::new(
+        // Résolveur vide : l'utilisateur n'appartient à aucun groupe autorisé.
+        // Empty resolver: the user belongs to no allowed group.
+        let policy = Arc::new(PeerAuthPolicy::with_resolver(
             HashSet::from([0]),
             HashSet::from([1234]),
+            Arc::new(|_uid| HashSet::new()),
         ));
         let mut intercept = PeerAuthInterceptor::new(policy, tx);
         let req = make(PeerCredentials {
@@ -147,6 +214,35 @@ mod tests {
         assert_eq!(event.category, EventCategory::Authentication);
         assert_eq!(event.severity, Severity::Warning);
         assert_eq!(event.metadata.get("uid").unwrap(), "1000");
+    }
+
+    #[test]
+    fn supplementary_group_member_is_allowed() {
+        // Cas réel : UI lancée normalement, gid primaire = groupe personnel (1001),
+        // mais l'utilisateur est membre *supplémentaire* du groupe syswall (1234).
+        // SO_PEERCRED ne voit que 1001 ; la résolution des groupes doit l'autoriser.
+        // Real case: UI launched normally, primary gid = personal group (1001), but the
+        // user is a *supplementary* member of the syswall group (1234). SO_PEERCRED only
+        // sees 1001; group resolution must still allow it.
+        let (tx, _rx) = audit_pair();
+        let policy = Arc::new(PeerAuthPolicy::with_resolver(
+            HashSet::from([0]),
+            HashSet::from([1234]),
+            Arc::new(|uid| {
+                if uid == 1000 {
+                    HashSet::from([1001, 1234])
+                } else {
+                    HashSet::new()
+                }
+            }),
+        ));
+        let mut intercept = PeerAuthInterceptor::new(policy, tx);
+        let req = make(PeerCredentials {
+            uid: 1000,
+            gid: 1001,
+            pid: 9,
+        });
+        assert!(intercept.call(req).is_ok());
     }
 
     #[test]

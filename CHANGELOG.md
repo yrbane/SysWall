@@ -3,6 +3,12 @@
 Toutes les modifications notables seront documentees ici.
 All notable changes documented here.
 
+## [0.3.2] - 2026-07-15 · « Connexions visibles : auth par groupe supplémentaire »
+
+### Fixed / Corrige
+
+- **L'UI lancée normalement était refusée par le daemon** (onglet Connexions vide, aucune donnée n'arrivait) : l'authentification gRPC par `SO_PEERCRED` ne comparait que le gid **primaire** du client au groupe `syswall`. Or un `syswall-ui` lancé normalement (icône de bureau, commande directe) tourne avec le gid primaire du groupe personnel de l'utilisateur — `syswall` n'étant qu'un groupe **supplémentaire** — d'où un refus (`gRPC denied: … gid=…`) répété toutes les 2 s, ne laissant fonctionner que `sg syswall -c syswall-ui`. `PeerAuthPolicy::permits` consulte désormais aussi les groupes **supplémentaires** de l'appelant (`getpwuid` + `getgrouplist`, résolveur injecté pour les tests). L'UI se connecte maintenant depuis l'icône de bureau, sans `sg`. / The normally-launched UI was denied by the daemon: SO_PEERCRED gRPC auth only compared the client's *primary* gid against the `syswall` group, but a normally-launched UI has `syswall` only as a *supplementary* group, causing a `gRPC denied` every 2 s. `PeerAuthPolicy::permits` now also consults the caller's supplementary groups.
+
 ## [0.3.1] - 2026-07-15 · « Déploiement en une commande »
 
 ### Fixed / Corrige
