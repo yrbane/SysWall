@@ -111,5 +111,9 @@ export type Severity = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 export type EventCategory = 'connection' | 'rule' | 'decision' | 'system' | 'config';
 export type RuleEffect = 'allow' | 'block' | 'ask' | 'observe';
 export type RuleSource = 'manual' | 'auto_learning' | 'import' | 'system';
-export type DecisionAction = 'allow_once' | 'block_once' | 'always_allow' | 'always_block' | 'create_rule' | 'ignore';
+// `defer:${number}` : reporte la decision de N secondes (snooze), forme acceptee
+// par le protocole gRPC depuis la V0.3.0. Le type doit rester aligne sur le runtime.
+// `defer:${number}`: snoozes the decision for N seconds, accepted by the gRPC
+// protocol since V0.3.0. The type must stay aligned with the runtime.
+export type DecisionAction = 'allow_once' | 'block_once' | 'always_allow' | 'always_block' | 'create_rule' | 'ignore' | `defer:${number}`;
 export type DecisionGranularity = 'app_only' | 'app_and_destination' | 'app_and_protocol' | 'full';
