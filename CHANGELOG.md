@@ -23,6 +23,7 @@ All notable changes documented here.
 ### Security / Securite
 
 - **`npm audit fix`** sur l'UI : corrige 3 vulnérabilités *high* et 2 *moderate* de la chaîne d'outils front (@sveltejs/kit, vite, svelte, postcss, cookie, devalue), transitives et sans rupture (semver). Débloque le job `audit` de la CI. / `npm audit fix` on the UI: fixes 3 high and 2 moderate front-end toolchain advisories, transitive and non-breaking. Unblocks the CI `audit` job.
+- **`crossbeam-epoch` 0.9.18 → 0.9.20** (RUSTSEC-2026-0204, déréférencement de pointeur invalide) : dépendance transitive de dev (criterion → rayon), corrigée par `cargo update`. Débloque les jobs `deny` et `audit`. / `crossbeam-epoch` bumped for RUSTSEC-2026-0204; transitive dev dependency, fixed via `cargo update`. Unblocks the `deny` and `audit` jobs.
 
 ## [0.3.0] - 2026-05-05
 
