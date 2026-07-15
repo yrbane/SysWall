@@ -74,6 +74,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify syswall.service hardening directives
         run: ./system/tests/check-hardening.sh
+      - name: Verify service/installers consistency (SYSWALL_CONFIG + syswall user)
+        run: ./system/tests/check-service-config.sh
 
   grpc-integration:
     name: gRPC integration tests

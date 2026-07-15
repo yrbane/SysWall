@@ -8,6 +8,11 @@ StartLimitBurst=5
 
 [Service]
 Type=notify
+# Chemin de config absolu : sans cette variable le daemon cherche config/default.toml
+# relatif au cwd (= / sous systemd) et echoue au demarrage.
+# Absolute config path: without this the daemon looks for config/default.toml relative
+# to the cwd (= / under systemd) and fails to start.
+Environment=SYSWALL_CONFIG=/etc/syswall/config.toml
 ExecStart=/usr/bin/syswall-daemon
 Restart=on-failure
 RestartSec=5

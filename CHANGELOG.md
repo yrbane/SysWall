@@ -3,6 +3,19 @@
 Toutes les modifications notables seront documentees ici.
 All notable changes documented here.
 
+## [0.3.1] - 2026-07-15 · « Déploiement en une commande »
+
+### Fixed / Corrige
+
+- **Le daemon ne démarrait pas sous systemd** : le unit ne pointait pas vers la config, le daemon cherchait alors `config/default.toml` relatif au cwd (`/` sous systemd) et crashait. Ajout de `Environment=SYSWALL_CONFIG=/etc/syswall/config.toml`. / The daemon failed to start under systemd because the unit did not reference the config; it looked for `config/default.toml` relative to cwd (`/`) and crashed. Added the absolute config path.
+- **`User=syswall` sans utilisateur** : le unit tourne en `User=syswall` mais les installeurs ne créaient que le groupe (le seul groupe fait échouer `systemctl start`). `install.sh` et `system/arch/syswall.install` créent désormais l'utilisateur système dédié (`useradd --system`). / The unit runs as `User=syswall` but installers only created the group, so `systemctl start` failed. Both installers now create the dedicated system user.
+- **`install.sh` cassé par le build UI** : le `cd crates/ui && … && cd ../..` laissait le cwd dans `crates/ui` quand le build UI échouait (exception `set -e` sur liste `&&`), faisant planter la copie du daemon. Racine résolue en absolu, build UI isolé dans un sous-shell non bloquant, appel direct du CLI `tauri build --no-bundle` (le `--` de `npm run` avalait le flag et le bundling AppImage, qui exige le réseau via linuxdeploy, tournait quand même), chemin du binaire UI corrigé (`target/release/ui`), et authentification sudo demandée en amont (échec rapide plutôt qu'après plusieurs minutes de build). / `install.sh` was broken by the UI build: a failed UI build left the cwd inside `crates/ui`, breaking the daemon copy. Root resolved absolutely, UI build isolated in a non-fatal subshell, tauri CLI called directly with `--no-bundle`, UI binary path fixed, and sudo authenticated upfront.
+
+### Added / Ajoute
+
+- **Installation en une seule commande** : `system/install.sh` détecte la distribution (`/etc/os-release`), refuse proprement les systèmes sans systemd, signale le paquet natif sur la famille Arch, puis **installe ET démarre** le service (`systemctl restart` + statut). / One-command install: `install.sh` detects the distribution, cleanly refuses non-systemd systems, hints the native package on the Arch family, then installs AND starts the service.
+- **Garde-fou CI** `system/tests/check-service-config.sh` : vérifie la cohérence unit/installeurs (`SYSWALL_CONFIG`, utilisateur `syswall`, détection distro, démarrage du service). Câblé au job `hardening-check`. / CI guard test asserting unit/installer consistency, wired into the `hardening-check` job.
+
 ## [0.3.0] - 2026-05-05
 
 Version de stabilisation post-V0.2 : finition technique, hardening CI, polish.

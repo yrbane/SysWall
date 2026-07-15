@@ -1,6 +1,11 @@
 post_install() {
     if ! getent group syswall > /dev/null 2>&1; then
-        groupadd syswall
+        groupadd --system syswall
+    fi
+    # Utilisateur systeme dedie exige par User=syswall dans le unit.
+    # Dedicated system user required by User=syswall in the unit.
+    if ! getent passwd syswall > /dev/null 2>&1; then
+        useradd --system --no-create-home --shell /usr/bin/nologin --gid syswall syswall
     fi
     mkdir -p /var/lib/syswall /var/log/syswall /var/run/syswall
     setcap 'cap_net_admin,cap_net_raw,cap_sys_ptrace,cap_dac_read_search,cap_bpf,cap_perfmon=ep' /usr/bin/syswall-daemon 2>/dev/null || true
