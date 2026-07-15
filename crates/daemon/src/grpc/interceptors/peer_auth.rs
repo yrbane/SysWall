@@ -29,10 +29,10 @@ fn nss_user_gids(uid: u32) -> HashSet<u32> {
     let mut gids = HashSet::new();
     if let Ok(Some(user)) = User::from_uid(Uid::from_raw(uid)) {
         gids.insert(user.gid.as_raw());
-        if let Ok(cname) = CString::new(user.name.as_bytes()) {
-            if let Ok(groups) = getgrouplist(&cname, user.gid) {
-                gids.extend(groups.into_iter().map(|g| g.as_raw()));
-            }
+        if let Ok(cname) = CString::new(user.name.as_bytes())
+            && let Ok(groups) = getgrouplist(&cname, user.gid)
+        {
+            gids.extend(groups.into_iter().map(|g| g.as_raw()));
         }
     }
     gids
