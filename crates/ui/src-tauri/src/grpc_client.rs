@@ -9,6 +9,7 @@ use tracing::info;
 
 use syswall_proto::syswall::sys_wall_control_client::SysWallControlClient;
 use syswall_proto::syswall::sys_wall_events_client::SysWallEventsClient;
+use syswall_proto::syswall::{DomainEventMessage, Empty};
 
 /// Path to the daemon Unix socket.
 const DEFAULT_SOCKET_PATH: &str = "/var/run/syswall/syswall.sock";
@@ -45,6 +46,20 @@ impl GrpcClient {
             control: SysWallControlClient::new(channel.clone()),
             events: SysWallEventsClient::new(channel),
         })
+    }
+
+    /// Fetch a snapshot of currently active connections as domain event
+    /// messages ("connection_detected"), used to seed the UI at startup.
+    /// Récupère un instantané des connexions actives sous forme de messages
+    /// d'événement de domaine ("connection_detected"), pour amorcer l'UI au démarrage.
+    pub async fn get_active_connections(&mut self) -> Result<Vec<DomainEventMessage>, String> {
+        let response = self
+            .control
+            .get_active_connections(Empty {})
+            .await
+            .map_err(|e| format!("gRPC error: {}", e))?;
+
+        Ok(response.into_inner().connections)
     }
 }
 

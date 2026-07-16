@@ -8,15 +8,36 @@
   import Input from '$lib/components/ui/Input.svelte';
   import AppIcon from '$lib/components/ui/AppIcon.svelte';
   import { page } from '$app/stores';
+  import { onMount } from 'svelte';
   import {
     filteredConnections,
     connectionFilters,
     connectionCounts,
     connectionList,
+    seedConnections,
   } from '$lib/stores/connections';
-  import { getProcessDetails, type ProcessDetails } from '$lib/api/client';
+  import {
+    getProcessDetails,
+    getActiveConnections,
+    type ProcessDetails,
+  } from '$lib/api/client';
   import { debounce } from '$lib/utils/debounce';
   import type { ConnectionEvent } from '$lib/types';
+
+  // Amorçage du store au montage : snapshot des connexions déjà actives.
+  // Le stream d'événements (initialisé dans le layout) prend ensuite le relais.
+  // Best-effort : toute erreur est ignorée silencieusement.
+  //
+  // Seed the store on mount: snapshot of already-active connections.
+  // The event stream (set up in the layout) then keeps it up to date.
+  // Best-effort: any error is silently ignored.
+  onMount(() => {
+    getActiveConnections()
+      .then((events) => seedConnections(events))
+      .catch(() => {
+        // Ignore — best-effort seeding
+      });
+  });
 
   // Sort state
   let sortKey = $state<string>('started_at');

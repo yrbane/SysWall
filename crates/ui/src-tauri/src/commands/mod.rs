@@ -1,5 +1,6 @@
 //! Tauri command modules — thin wrappers around gRPC calls.
 
+pub mod connections;
 pub mod decisions;
 pub mod process;
 pub mod rules;

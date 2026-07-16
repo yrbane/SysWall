@@ -90,6 +90,7 @@ mod tests {
             event_bus,
             DefaultPolicy::Block,
             dns_resolver,
+            Arc::new(FakeConnectionMonitor::new()),
         );
 
         // Simulate a connection event
@@ -116,6 +117,7 @@ mod tests {
             event_bus,
             DefaultPolicy::Ask,
             dns_resolver,
+            Arc::new(FakeConnectionMonitor::new()),
         );
 
         let conn = make_connection(Protocol::Tcp, "93.184.216.34", 443, Direction::Outbound);
@@ -146,6 +148,7 @@ mod tests {
             event_bus,
             DefaultPolicy::Block,
             dns_resolver,
+            Arc::new(FakeConnectionMonitor::new()),
         );
 
         // DNS query should be allowed by whitelist
@@ -209,6 +212,7 @@ mod tests {
             event_bus.clone(),
             DefaultPolicy::Block,
             dns_resolver,
+            Arc::new(FakeConnectionMonitor::new()),
         );
 
         let learning_service = LearningService::new(

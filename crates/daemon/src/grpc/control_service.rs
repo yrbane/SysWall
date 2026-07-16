@@ -5,24 +5,30 @@ use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
 use syswall_app::services::audit_service::{AuditService, ExportFormat};
+use syswall_app::services::connection_service::ConnectionService;
 use syswall_app::services::learning_service::LearningService;
 use syswall_app::services::rule_service::RuleService;
 use syswall_domain::entities::RuleId;
-use syswall_domain::events::Pagination;
+use syswall_domain::events::{DomainEvent, Pagination};
 use syswall_domain::ports::{FirewallEngine, RuleFilters};
 use syswall_proto::syswall::sys_wall_control_server::SysWallControl;
 use syswall_proto::syswall::{
-    AuditLogRequest, AuditLogResponse, CreateRuleRequest, DashboardStatsRequest,
-    DashboardStatsResponse, DecisionAck, DecisionResponseRequest, Empty, ExportAuditLogRequest,
-    ExportAuditLogResponse, PendingDecisionListResponse, RuleFiltersRequest, RuleIdRequest,
-    RuleListResponse, RuleResponse, SetNetworkEnabledRequest, StatusResponse, ToggleRuleRequest,
+    ActiveConnectionsResponse, AuditLogRequest, AuditLogResponse, CreateRuleRequest,
+    DashboardStatsRequest, DashboardStatsResponse, DecisionAck, DecisionResponseRequest, Empty,
+    ExportAuditLogRequest, ExportAuditLogResponse, PendingDecisionListResponse, RuleFiltersRequest,
+    RuleIdRequest, RuleListResponse, RuleResponse, SetNetworkEnabledRequest, StatusResponse,
+    ToggleRuleRequest,
 };
 
 use super::converters::{
-    audit_event_to_proto, audit_stats_to_proto, domain_error_to_status, pending_decision_to_proto,
-    proto_to_audit_filters, proto_to_create_rule_cmd, proto_to_respond_cmd, rule_to_proto,
-    status_to_proto,
+    audit_event_to_proto, audit_stats_to_proto, domain_error_to_status, domain_event_to_proto,
+    pending_decision_to_proto, proto_to_audit_filters, proto_to_create_rule_cmd,
+    proto_to_respond_cmd, rule_to_proto, status_to_proto,
 };
+
+/// Nombre maximum de connexions actives renvoyées par le snapshot.
+/// Maximum number of active connections returned by the snapshot.
+const MAX_ACTIVE_CONNECTIONS: usize = 500;
 
 /// Control service holding Arc references to the app services.
 /// Service de contrôle détenant des références Arc vers les services applicatifs.
@@ -31,6 +37,7 @@ pub struct SysWallControlService {
     learning_service: Arc<LearningService>,
     firewall: Arc<dyn FirewallEngine>,
     audit_service: Arc<AuditService>,
+    connection_service: Arc<ConnectionService>,
 }
 
 impl SysWallControlService {
@@ -41,12 +48,14 @@ impl SysWallControlService {
         learning_service: Arc<LearningService>,
         firewall: Arc<dyn FirewallEngine>,
         audit_service: Arc<AuditService>,
+        connection_service: Arc<ConnectionService>,
     ) -> Self {
         Self {
             rule_service,
             learning_service,
             firewall,
             audit_service,
+            connection_service,
         }
     }
 }
@@ -333,5 +342,27 @@ impl SysWallControl for SysWallControlService {
         }
 
         Ok(Response::new(Empty {}))
+    }
+
+    async fn get_active_connections(
+        &self,
+        _request: Request<Empty>,
+    ) -> Result<Response<ActiveConnectionsResponse>, Status> {
+        let connections = self
+            .connection_service
+            .list_active_connections(MAX_ACTIVE_CONNECTIONS)
+            .await
+            .map_err(domain_error_to_status)?;
+
+        // Chaque connexion est encodée comme un événement ConnectionDetected,
+        // pour que l'UI réutilise sa logique de rendu des événements.
+        // Each connection is encoded as a ConnectionDetected event so the UI
+        // reuses its event rendering logic.
+        let connections = connections
+            .into_iter()
+            .map(|conn| domain_event_to_proto(&DomainEvent::ConnectionDetected(conn)))
+            .collect();
+
+        Ok(Response::new(ActiveConnectionsResponse { connections }))
     }
 }

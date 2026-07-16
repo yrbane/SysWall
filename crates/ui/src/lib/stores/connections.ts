@@ -110,17 +110,40 @@ export const connectionCounts = derived(connections, ($conns) => {
   return { total, allowed, blocked, pending };
 });
 
+// Upsert a single connection into the store from a raw serialized payload.
+// Insère/met à jour une connexion dans le store depuis un payload sérialisé brut.
+function upsertConnectionFromPayload(payloadJson: string): void {
+  const raw = JSON.parse(payloadJson);
+  const conn = flattenConnection(raw);
+  connections.update((map) => {
+    map.set(conn.id, conn);
+    return new Map(map);
+  });
+}
+
+// Seed the store from a snapshot of active connections (best-effort).
+// Each entry mirrors a "connection_detected" event (payload_json = Connection).
+//
+// Amorce le store depuis un instantané de connexions actives (best-effort).
+// Chaque entrée reflète un événement "connection_detected" (payload_json = Connection).
+export function seedConnections(
+  events: Array<{ event_type: string; payload_json: string; timestamp: string }>
+): void {
+  for (const event of events) {
+    try {
+      upsertConnectionFromPayload(event.payload_json);
+    } catch {
+      // Ignore les entrées malformées / ignore malformed entries
+    }
+  }
+}
+
 export function initConnectionListeners(): () => void {
   const unlisteners: (() => void)[] = [];
 
   listen<DomainEventPayload>('syswall://connection-detected', (event) => {
     try {
-      const raw = JSON.parse(event.payload.payload_json);
-      const conn = flattenConnection(raw);
-      connections.update((map) => {
-        map.set(conn.id, conn);
-        return new Map(map);
-      });
+      upsertConnectionFromPayload(event.payload.payload_json);
     } catch {
       // Ignore
     }

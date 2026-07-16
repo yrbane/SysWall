@@ -4383,7 +4383,7 @@ dependencies = [
 
 [[package]]
 name = "syswall-app"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4401,7 +4401,7 @@ dependencies = [
 
 [[package]]
 name = "syswall-daemon"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4434,7 +4434,7 @@ dependencies = [
 
 [[package]]
 name = "syswall-domain"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4452,7 +4452,7 @@ dependencies = [
 
 [[package]]
 name = "syswall-ebpf"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "async-trait",
  "aya",
@@ -4466,7 +4466,7 @@ dependencies = [
 
 [[package]]
 name = "syswall-infra"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4493,7 +4493,7 @@ dependencies = [
 
 [[package]]
 name = "syswall-proto"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "prost",
  "prost-types",

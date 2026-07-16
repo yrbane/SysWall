@@ -33,6 +33,22 @@ export async function toggleRule(id: string, enabled: boolean): Promise<RuleMess
   return invoke<RuleMessage>('toggle_rule', { id, enabled });
 }
 
+// --- Connections ---
+
+// Un événement de connexion active (reflète DomainEventMessage côté daemon).
+// An active-connection event (mirrors the daemon's DomainEventMessage).
+export interface ActiveConnectionEvent {
+  event_type: string;
+  payload_json: string;
+  timestamp: string;
+}
+
+// Instantané des connexions actives pour amorcer le store au montage.
+// Snapshot of active connections used to seed the store on mount.
+export async function getActiveConnections(): Promise<ActiveConnectionEvent[]> {
+  return invoke<ActiveConnectionEvent[]>('get_active_connections');
+}
+
 // --- Decisions ---
 
 export async function listPendingDecisions(): Promise<PendingDecisionMessage[]> {

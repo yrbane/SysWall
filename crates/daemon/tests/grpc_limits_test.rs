@@ -28,11 +28,11 @@ use syswall_proto::syswall::sys_wall_control_client::SysWallControlClient;
 use syswall_proto::syswall::sys_wall_control_server::{SysWallControl, SysWallControlServer};
 use syswall_proto::syswall::sys_wall_events_server::{SysWallEvents, SysWallEventsServer};
 use syswall_proto::syswall::{
-    AuditLogRequest, AuditLogResponse, CreateRuleRequest, DashboardStatsRequest,
-    DashboardStatsResponse, DecisionAck, DecisionResponseRequest, DomainEventMessage, Empty,
-    ExportAuditLogRequest, ExportAuditLogResponse, PendingDecisionListResponse, RuleFiltersRequest,
-    RuleIdRequest, RuleListResponse, RuleResponse, SetNetworkEnabledRequest, StatusResponse,
-    SubscribeRequest, ToggleRuleRequest,
+    ActiveConnectionsResponse, AuditLogRequest, AuditLogResponse, CreateRuleRequest,
+    DashboardStatsRequest, DashboardStatsResponse, DecisionAck, DecisionResponseRequest,
+    DomainEventMessage, Empty, ExportAuditLogRequest, ExportAuditLogResponse,
+    PendingDecisionListResponse, RuleFiltersRequest, RuleIdRequest, RuleListResponse, RuleResponse,
+    SetNetworkEnabledRequest, StatusResponse, SubscribeRequest, ToggleRuleRequest,
 };
 
 // ---------------------------------------------------------------------------
@@ -145,6 +145,15 @@ impl SysWallControl for StubControlService {
         _req: tonic::Request<SetNetworkEnabledRequest>,
     ) -> Result<tonic::Response<Empty>, tonic::Status> {
         Ok(tonic::Response::new(Empty {}))
+    }
+
+    async fn get_active_connections(
+        &self,
+        _req: tonic::Request<Empty>,
+    ) -> Result<tonic::Response<ActiveConnectionsResponse>, tonic::Status> {
+        Ok(tonic::Response::new(ActiveConnectionsResponse {
+            connections: vec![],
+        }))
     }
 }
 

@@ -221,6 +221,7 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
         event_bus.clone(),
         default_policy,
         dns_resolver,
+        connection_monitor.clone(),
     ));
 
     let verdict_broadcasts = Arc::new(VerdictBroadcasts::new());

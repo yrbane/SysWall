@@ -3,7 +3,9 @@ use std::sync::Arc;
 use syswall_domain::entities::Connection;
 use syswall_domain::errors::DomainError;
 use syswall_domain::events::{DefaultPolicy, DomainEvent};
-use syswall_domain::ports::{DnsResolver, EventBus, ProcessResolver, RuleRepository};
+use syswall_domain::ports::{
+    ConnectionMonitor, DnsResolver, EventBus, ProcessResolver, RuleRepository,
+};
 use syswall_domain::services::PolicyEngine;
 
 /// Service for processing network connections (enrichment + policy evaluation).
@@ -19,6 +21,9 @@ pub struct ConnectionService {
     /// DNS resolver for reverse IP lookups on remote addresses.
     /// Résolveur DNS pour les recherches IP inverses sur les adresses distantes.
     dns_resolver: Arc<dyn DnsResolver>,
+    /// Connection monitor for active-connection snapshots (conntrack -L).
+    /// Moniteur de connexion pour les instantanés de connexions actives (conntrack -L).
+    connection_monitor: Arc<dyn ConnectionMonitor>,
 }
 
 impl ConnectionService {
@@ -28,6 +33,7 @@ impl ConnectionService {
         event_bus: Arc<dyn EventBus>,
         default_policy: DefaultPolicy,
         dns_resolver: Arc<dyn DnsResolver>,
+        connection_monitor: Arc<dyn ConnectionMonitor>,
     ) -> Self {
         Self {
             process_resolver,
@@ -35,12 +41,16 @@ impl ConnectionService {
             event_bus,
             default_policy,
             dns_resolver,
+            connection_monitor,
         }
     }
 
-    /// Enrich a raw connection with process info and evaluate against rules.
-    /// Enrichit une connexion brute avec les infos processus et évalue les règles.
-    pub async fn process_connection(
+    /// Enrich a raw connection with process info + reverse DNS and evaluate it
+    /// against the active rules, WITHOUT publishing any event.
+    ///
+    /// Enrichit une connexion brute (infos processus + DNS inverse) et l'évalue
+    /// contre les règles actives, SANS publier d'événement.
+    async fn enrich_and_evaluate(
         &self,
         mut connection: Connection,
     ) -> Result<Connection, DomainError> {
@@ -123,13 +133,26 @@ impl ConnectionService {
         connection.verdict = evaluation.verdict;
         connection.matched_rule = evaluation.matched_rule_id;
 
+        Ok(connection)
+    }
+
+    /// Enrich a raw connection with process info and evaluate against rules,
+    /// then publish the resulting events on the bus.
+    /// Enrichit une connexion brute avec les infos processus et évalue les règles,
+    /// puis publie les événements résultants sur le bus.
+    pub async fn process_connection(
+        &self,
+        connection: Connection,
+    ) -> Result<Connection, DomainError> {
+        let connection = self.enrich_and_evaluate(connection).await?;
+
         // Publish event
         let _ = self
             .event_bus
             .publish(DomainEvent::ConnectionDetected(connection.clone()))
             .await;
 
-        if let Some(rule_id) = evaluation.matched_rule_id {
+        if let Some(rule_id) = connection.matched_rule {
             let _ = self
                 .event_bus
                 .publish(DomainEvent::RuleMatched {
@@ -141,6 +164,27 @@ impl ConnectionService {
         }
 
         Ok(connection)
+    }
+
+    /// Return a snapshot of currently active connections, enriched and
+    /// evaluated, capped at `max` entries. This is a query: NO event is
+    /// published.
+    ///
+    /// Retourne un instantané des connexions actuellement actives, enrichies et
+    /// évaluées, limité à `max` entrées. C'est une requête : AUCUN événement
+    /// n'est publié.
+    pub async fn list_active_connections(
+        &self,
+        max: usize,
+    ) -> Result<Vec<Connection>, DomainError> {
+        let raw = self.connection_monitor.get_active_connections().await?;
+
+        let mut result = Vec::with_capacity(raw.len().min(max));
+        for conn in raw.into_iter().take(max) {
+            result.push(self.enrich_and_evaluate(conn).await?);
+        }
+
+        Ok(result)
     }
 }
 
@@ -191,6 +235,7 @@ mod tests {
         let rule_repo = Arc::new(FakeRuleRepository::new());
         let event_bus = Arc::new(FakeEventBus::new());
         let dns_resolver = Arc::new(FakeDnsResolver::new());
+        let connection_monitor = Arc::new(FakeConnectionMonitor::new());
 
         let service = ConnectionService::new(
             process_resolver,
@@ -198,6 +243,7 @@ mod tests {
             event_bus,
             DefaultPolicy::Block,
             dns_resolver,
+            connection_monitor,
         );
 
         let conn = service.process_connection(test_connection()).await.unwrap();
@@ -230,16 +276,83 @@ mod tests {
             .unwrap();
 
         let dns_resolver = Arc::new(FakeDnsResolver::new());
+        let connection_monitor = Arc::new(FakeConnectionMonitor::new());
         let service = ConnectionService::new(
             process_resolver,
             rule_repo,
             event_bus,
             DefaultPolicy::Block,
             dns_resolver,
+            connection_monitor,
         );
 
         let conn = service.process_connection(test_connection()).await.unwrap();
         assert_eq!(conn.verdict, ConnectionVerdict::Allowed);
         assert_eq!(conn.matched_rule, Some(rule.id));
+    }
+
+    #[tokio::test]
+    async fn list_active_connections_returns_enriched_snapshot() {
+        // Trois connexions actives brutes (verdict Unknown, sans hostname).
+        // Three raw active connections (Unknown verdict, no hostname).
+        let mut raw = Vec::new();
+        for _ in 0..3 {
+            raw.push(test_connection());
+        }
+        let process_resolver = Arc::new(FakeProcessResolver::new());
+        let rule_repo = Arc::new(FakeRuleRepository::new());
+        let event_bus = Arc::new(FakeEventBus::new());
+        let firewall = Arc::new(FakeFirewallEngine::new());
+
+        // Une règle Allow sur le port 443 pour vérifier l'évaluation.
+        // An Allow rule on port 443 to verify evaluation runs.
+        let rule_service = RuleService::new(rule_repo.clone(), firewall, event_bus.clone());
+        let rule = rule_service
+            .create_rule(CreateRuleCommand {
+                name: "Allow HTTPS".to_string(),
+                priority: 10,
+                criteria: RuleCriteria {
+                    remote_port: Some(PortMatcher::Exact(Port::new(443).unwrap())),
+                    protocol: Some(Protocol::Tcp),
+                    ..Default::default()
+                },
+                effect: RuleEffect::Allow,
+                scope: RuleScope::Permanent,
+                source: RuleSource::Manual,
+            })
+            .await
+            .unwrap();
+
+        let dns_resolver = Arc::new(FakeDnsResolver::new());
+        let connection_monitor = Arc::new(FakeConnectionMonitor::with_connections(raw));
+
+        // Abonnement avant l'appel pour vérifier qu'aucun événement n'est émis.
+        // Subscribe before the call to assert no event is emitted.
+        let mut receiver = event_bus.subscribe();
+
+        let service = ConnectionService::new(
+            process_resolver,
+            rule_repo,
+            event_bus.clone(),
+            DefaultPolicy::Block,
+            dns_resolver,
+            connection_monitor,
+        );
+
+        // La limite `max` est respectée : 2 sur les 3 disponibles.
+        // The `max` cap is honored: 2 out of the 3 available.
+        let snapshot = service.list_active_connections(2).await.unwrap();
+        assert_eq!(snapshot.len(), 2);
+
+        // Chaque connexion est enrichie/évaluée (verdict Allowed + règle liée).
+        // Each connection is enriched/evaluated (Allowed verdict + matched rule).
+        for conn in &snapshot {
+            assert_eq!(conn.verdict, ConnectionVerdict::Allowed);
+            assert_eq!(conn.matched_rule, Some(rule.id));
+        }
+
+        // Une requête ne publie AUCUN événement.
+        // A query publishes NO event.
+        assert!(receiver.try_recv().is_err());
     }
 }

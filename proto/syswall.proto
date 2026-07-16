@@ -16,6 +16,9 @@ service SysWallControl {
     rpc GetDashboardStats(DashboardStatsRequest) returns (DashboardStatsResponse);
     rpc ExportAuditLog(ExportAuditLogRequest) returns (ExportAuditLogResponse);
     rpc SetNetworkEnabled(SetNetworkEnabledRequest) returns (Empty);
+    // Snapshot des connexions actuellement actives (amorçage de l'UI).
+    // Snapshot of currently active connections (UI seeding).
+    rpc GetActiveConnections(Empty) returns (ActiveConnectionsResponse);
 }
 
 // --- Event Service (streaming) ---
@@ -112,6 +115,16 @@ message DomainEventMessage {
     string event_type = 1;
     string payload_json = 2;
     string timestamp = 3;
+}
+
+// Réponse du snapshot des connexions actives : chaque entrée est un
+// DomainEventMessage de type "connection_detected" (payload = Connection JSON),
+// afin que l'UI réutilise sa logique de rendu des événements.
+// Active connections snapshot response: each entry is a "connection_detected"
+// DomainEventMessage (payload = Connection JSON), so the UI reuses its event
+// rendering logic.
+message ActiveConnectionsResponse {
+    repeated DomainEventMessage connections = 1;
 }
 
 // --- Audit Messages ---

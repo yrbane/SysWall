@@ -3,6 +3,12 @@
 Toutes les modifications notables seront documentees ici.
 All notable changes documented here.
 
+## [0.3.3] - 2026-07-16 · « Snapshot des connexions actives »
+
+### Added / Ajoute
+
+- **Amorçage de l'onglet Connexions à l'ouverture** : jusqu'ici la liste des connexions était exclusivement pilotée par le stream d'événements gRPC, si bien que les connexions **déjà actives** au lancement de l'UI restaient invisibles jusqu'à ce qu'un nouvel événement les concerne. Un nouveau RPC `GetActiveConnections(Empty) → ActiveConnectionsResponse` expose désormais un instantané des connexions actives (via `conntrack -L`), enrichies (processus + DNS inverse) et évaluées contre les règles, sans publication d'événement. Chaque entrée est encodée comme un `DomainEventMessage` de type `connection_detected` afin que le frontend réutilise sa logique de rendu existante. Au montage, l'onglet Connexions amorce son store à partir de ce snapshot (best-effort), puis le stream d'événements prend le relais. / **Seeding of the Connections tab on open**: the connection list was previously driven exclusively by the gRPC event stream, so connections **already active** when the UI started stayed invisible until a new event touched them. A new `GetActiveConnections(Empty) → ActiveConnectionsResponse` RPC now exposes a snapshot of active connections (via `conntrack -L`), enriched (process + reverse DNS) and evaluated against the rules, without publishing any event. Each entry is encoded as a `connection_detected` `DomainEventMessage` so the frontend reuses its existing rendering logic. On mount, the Connections tab seeds its store from this snapshot (best-effort), then the event stream takes over.
+
 ## [0.3.2] - 2026-07-15 · « Connexions visibles : auth par groupe supplémentaire »
 
 ### Fixed / Corrige

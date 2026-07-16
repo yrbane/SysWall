@@ -157,6 +157,7 @@ async fn run() -> Result<(), StartupError> {
             ctx.learning_service.clone(),
             ctx.firewall.clone(),
             ctx.audit_service.clone(),
+            ctx.connection_service.clone(),
         );
         let event_service = SysWallEventService::new(ctx.event_bus.clone());
         let socket_path = config.daemon.socket_path.clone();
