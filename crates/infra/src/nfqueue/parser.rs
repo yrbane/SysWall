@@ -34,8 +34,16 @@ impl From<ParseError> for DomainError {
 /// Parse un paquet brut (commençant à l'en-tête IP) en Connection domain.
 /// Parse a raw packet (starting at the IP header) into a domain Connection.
 pub fn parse_packet(bytes: &[u8]) -> Result<Connection, ParseError> {
-    if bytes.len() < 20 {
-        return Err(ParseError::Malformed);
+    // Pré-check de troncature famille-conscient : on lit le nibble de version (4 bits de poids
+    // fort du 1er octet) pour exiger la taille minimale du bon en-tête — 20 octets pour IPv4,
+    // 40 pour IPv6. etherparse revalide entièrement derrière ; ce garde reste purement défensif.
+    // Family-aware truncation pre-check: read the version nibble (high 4 bits of the first byte)
+    // to require the correct minimum header size — 20 bytes for IPv4, 40 for IPv6. etherparse
+    // fully re-validates afterwards; this guard stays purely defensive.
+    match bytes.first().map(|&b| b >> 4) {
+        Some(4) if bytes.len() >= 20 => {}
+        Some(6) if bytes.len() >= 40 => {}
+        _ => return Err(ParseError::Malformed),
     }
     let parsed = SlicedPacket::from_ip(bytes).map_err(|e| ParseError::Etherparse(e.to_string()))?;
 
@@ -57,6 +65,14 @@ pub fn parse_packet(bytes: &[u8]) -> Result<Connection, ParseError> {
         _ => return Err(ParseError::UnsupportedL3),
     };
 
+    // Seuls TCP et UDP sont décodés ici : ce sont les seuls protocoles pour lesquels une décision
+    // par-connexion (par port) a du sens dans NFQUEUE. ICMP, ICMPv6 et NDP (Neighbor Discovery)
+    // ne sont volontairement PAS interceptés au niveau paquet — parité stricte avec ICMPv4, hors
+    // périmètre de la décision par-connexion. Aucune variante Protocol::Icmpv6 n'est introduite.
+    // Only TCP and UDP are decoded here: they are the only protocols for which a per-connection
+    // (per-port) decision is meaningful in NFQUEUE. ICMP, ICMPv6 and NDP (Neighbor Discovery) are
+    // intentionally NOT intercepted at packet level — strict parity with ICMPv4, out of scope for
+    // per-connection decisions. No Protocol::Icmpv6 variant is introduced.
     let (protocol, src_port_raw, dst_port_raw) = match &parsed.transport {
         Some(TransportSlice::Tcp(t)) => (Protocol::Tcp, t.source_port(), t.destination_port()),
         Some(TransportSlice::Udp(u)) => (Protocol::Udp, u.source_port(), u.destination_port()),
@@ -172,5 +188,26 @@ mod tests {
     fn rejects_truncated_packet() {
         let result = parse_packet(&[0u8; 4]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn parses_ipv6_truncated_returns_malformed() {
+        // L'en-tête IPv6 fait 40 octets. Un paquet dont le nibble de version vaut 6 mais tronqué
+        // à 20-39 octets doit être rejeté proprement (Malformed) : pas de panique, pas de faux
+        // parse. Vérifie que le pré-check de troncature est bien famille-conscient.
+        // The IPv6 header is 40 bytes. A packet whose version nibble is 6 but truncated to 20-39
+        // bytes must be cleanly rejected (Malformed): no panic, no false parse. Ensures the
+        // truncation pre-check is family-aware.
+        let full = build_ipv6_udp();
+        assert!(full.len() >= 40, "fixture v6 doit dépasser l'en-tête");
+        for len in [20usize, 30, 39] {
+            let truncated = &full[..len];
+            // Premier octet 0x60 -> version 6 ; longueur < 40 -> Malformed.
+            // First byte 0x60 -> version 6; length < 40 -> Malformed.
+            assert!(
+                matches!(parse_packet(truncated), Err(ParseError::Malformed)),
+                "un paquet v6 de {len} octets doit être Malformed"
+            );
+        }
     }
 }

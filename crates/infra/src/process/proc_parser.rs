@@ -224,6 +224,42 @@ mod tests {
     }
 
     #[test]
+    fn parse_proc_net_udp6_line() {
+        // Ligne réelle de /proc/net/udp6 : adresse v6 sur 128 bits en hexadécimal (little-endian
+        // par groupes de 32 bits) + port. Vérifie que parse_hex_ipv6 et le tuple (ip, port) sont
+        // corrects. Ici l'adresse locale est ::1 (loopback v6) sur le port 0x0035 = 53.
+        // Real /proc/net/udp6 line: 128-bit v6 address in hex (little-endian per 32-bit group) +
+        // port. Ensures parse_hex_ipv6 and the (ip, port) tuple are correct. Here the local
+        // address is ::1 (v6 loopback) on port 0x0035 = 53.
+        let content = "  sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n  10: 00000000000000000000000001000000:0035 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 54321 2 0000000000000000 0\n";
+        // udp6 partage le format hexadécimal de tcp6, donc le parseur tcp6 le décode fidèlement.
+        // udp6 shares tcp6's hex format, so the tcp6 parser decodes it faithfully.
+        let entries = parse_proc_net_tcp6(content);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].local_ip, "::1".parse::<IpAddr>().unwrap());
+        assert!(entries[0].local_ip.is_ipv6());
+        assert_eq!(entries[0].local_port, 53);
+        assert_eq!(entries[0].uid, 0);
+        assert_eq!(entries[0].inode, 54321);
+    }
+
+    #[test]
+    fn parse_hex_ipv6_loopback_tuple() {
+        // parse_hex_ipv6 sur l'adresse loopback v6 (::1) telle qu'encodée dans /proc/net/*6.
+        // parse_hex_ipv6 on the v6 loopback address (::1) as encoded in /proc/net/*6.
+        let ip = parse_hex_ipv6("00000000000000000000000001000000").unwrap();
+        assert_eq!(ip, "::1".parse::<IpAddr>().unwrap());
+        assert!(ip.is_ipv6());
+    }
+
+    #[test]
+    fn parse_hex_ipv6_invalid_length() {
+        // Une chaîne qui n'a pas exactement 32 caractères hex doit renvoyer None (pas de panique).
+        // A string that is not exactly 32 hex chars must return None (no panic).
+        assert!(parse_hex_ipv6("0100").is_none());
+    }
+
+    #[test]
     fn parse_proc_net_tcp_empty() {
         let content = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n";
         let entries = parse_proc_net_tcp(content);

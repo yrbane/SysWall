@@ -15,39 +15,48 @@ pub fn parse_conntrack_line(line: &str) -> Option<ConntrackEvent> {
         return None;
     }
 
-    // Parse timestamp: [1711468800.123456]
-    let ts_end = line.find(']')?;
-    let ts_str = &line[1..ts_end];
-    let timestamp: f64 = ts_str.parse().ok()?;
+    // Deux formats sont acceptés :
+    //   - `conntrack -E` (événements) : préfixe horodatage `[epoch.usec]` puis type `[NEW]`/…
+    //   - `conntrack -L -o extended` (instantané) : PAS d'horodatage ni de type, mais un label L3
+    //     (`ipv4 2` / `ipv6 10`) précède le protocole L4.
+    // On consomme un horodatage entre crochets seulement s'il parse en flottant ; sinon toute la
+    // ligne est le corps. Le type d'événement est optionnel (défaut New pour les entrées actives).
+    // Two formats are accepted:
+    //   - `conntrack -E` (events): `[epoch.usec]` timestamp prefix then a `[NEW]`/… event type
+    //   - `conntrack -L -o extended` (snapshot): NO timestamp nor event type, but an L3 label
+    //     (`ipv4 2` / `ipv6 10`) precedes the L4 protocol.
+    // We consume a bracketed timestamp only when it parses as a float; otherwise the whole line is
+    // the body. The event type is optional (defaults to New for active/snapshot entries).
+    let (timestamp, body) = match line.strip_prefix('[') {
+        Some(after) => match after.split_once(']') {
+            Some((maybe_ts, rest)) => match maybe_ts.parse::<f64>() {
+                Ok(ts) => (ts, rest),
+                Err(_) => (0.0, line),
+            },
+            None => (0.0, line),
+        },
+        None => (0.0, line),
+    };
 
-    let rest = &line[ts_end + 1..];
-
-    // Tokenize the rest
-    let tokens: Vec<&str> = rest.split_whitespace().collect();
+    // Tokenize the body
+    let tokens: Vec<&str> = body.split_whitespace().collect();
     if tokens.len() < 5 {
         return None;
     }
 
-    // Find event type: [NEW], [UPDATE], [DESTROY]
-    let mut event_type = None;
-    let mut event_type_idx = 0;
-    for (i, token) in tokens.iter().enumerate() {
-        if let Some(et) = parse_event_type(token) {
-            event_type = Some(et);
-            event_type_idx = i;
-            break;
-        }
-    }
-    let event_type = event_type?;
+    // Event type: [NEW]/[UPDATE]/[DESTROY] en mode `-E`, absent en mode `-L` (défaut New).
+    // Event type: [NEW]/[UPDATE]/[DESTROY] in `-E` mode, absent in `-L` mode (defaults to New).
+    let event_type = tokens
+        .iter()
+        .find_map(|token| parse_event_type(token))
+        .unwrap_or(ConntrackEventType::New);
 
-    // Protocol is next token after event type
-    let proto_idx = event_type_idx + 1;
-    if proto_idx >= tokens.len() {
-        return None;
-    }
+    // Protocole L4 repéré par nom (tcp/udp/icmp) : robuste au label L3 optionnel de `-o extended`.
+    // L4 protocol located by name (tcp/udp/icmp): robust to the optional `-o extended` L3 label.
+    let proto_idx = tokens.iter().position(|t| parse_protocol(t).is_some())?;
     let protocol = parse_protocol(tokens[proto_idx])?;
 
-    // Protocol number is next
+    // Protocol number is the next token
     let proto_num_idx = proto_idx + 1;
     let proto_number: u8 = if proto_num_idx < tokens.len() {
         tokens[proto_num_idx].parse().unwrap_or(0)
@@ -56,7 +65,7 @@ pub fn parse_conntrack_line(line: &str) -> Option<ConntrackEvent> {
     };
 
     // Find state: known TCP states appearing before first key=value pair
-    let kv_tokens = &tokens[proto_num_idx + 1..];
+    let kv_tokens = tokens.get(proto_num_idx + 1..).unwrap_or(&[]);
     let mut state = None;
     let known_states = [
         "SYN_SENT",
@@ -223,6 +232,45 @@ mod tests {
     #[test]
     fn empty_line_returns_none() {
         assert!(parse_conntrack_line("").is_none());
+    }
+
+    #[test]
+    fn parse_list_extended_ipv6_line() {
+        // VRAIE ligne `conntrack -L -o extended` en IPv6 : pas d'horodatage entre crochets ni de
+        // type d'événement ([NEW]/…), mais un label L3 (`ipv6 10`) précède le protocole L4. Le
+        // parser doit extraire adresses v6, protocole et ports correctement.
+        // REAL `conntrack -L -o extended` IPv6 line: no bracketed timestamp nor event type
+        // ([NEW]/…), but an L3 label (`ipv6 10`) precedes the L4 protocol. The parser must extract
+        // the v6 addresses, protocol and ports correctly.
+        let line = "ipv6     10 tcp      6 431999 ESTABLISHED src=2001:db8::1 dst=2001:db8::2 sport=45000 dport=443 src=2001:db8::2 dst=2001:db8::1 sport=443 dport=45000 [ASSURED] mark=0 use=1";
+        let event = parse_conntrack_line(line).unwrap();
+        assert_eq!(event.protocol, Protocol::Tcp);
+        assert_eq!(event.proto_number, 6);
+        assert_eq!(event.src, "2001:db8::1".parse::<IpAddr>().unwrap());
+        assert_eq!(event.dst, "2001:db8::2".parse::<IpAddr>().unwrap());
+        assert!(event.src.is_ipv6());
+        assert_eq!(event.sport, 45000);
+        assert_eq!(event.dport, 443);
+        assert_eq!(event.state, Some("ESTABLISHED".to_string()));
+        assert_eq!(
+            event.reply_src,
+            Some("2001:db8::2".parse::<IpAddr>().unwrap())
+        );
+        assert_eq!(event.reply_dport, Some(45000));
+    }
+
+    #[test]
+    fn parse_list_extended_ipv6_udp_line() {
+        // Ligne `-L -o extended` UDP IPv6 sans marqueur [ASSURED] : couvre le cas sans aucun
+        // crochet dans la ligne.
+        // `-L -o extended` IPv6 UDP line without an [ASSURED] marker: covers the case where the
+        // line has no bracket at all.
+        let line = "ipv6     10 udp      17 29 src=2001:db8::a dst=2001:db8::b sport=52000 dport=53 src=2001:db8::b dst=2001:db8::a sport=53 dport=52000 mark=0 use=1";
+        let event = parse_conntrack_line(line).unwrap();
+        assert_eq!(event.protocol, Protocol::Udp);
+        assert_eq!(event.proto_number, 17);
+        assert_eq!(event.src, "2001:db8::a".parse::<IpAddr>().unwrap());
+        assert_eq!(event.dport, 53);
     }
 
     #[test]

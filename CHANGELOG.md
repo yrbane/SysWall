@@ -3,6 +3,21 @@
 Toutes les modifications notables seront documentees ici.
 All notable changes documented here.
 
+## [0.3.4] - 2026-07-16 · « Durcissement IPv6 »
+
+### Fixed / Corrige
+
+- **Pré-check de troncature NFQUEUE famille-conscient** : le garde en tête de `parse_packet` exigeait toujours 20 octets (en-tête IPv4 minimal) avant le décodage etherparse, alors que l'en-tête IPv6 en fait 40. Le garde est désormais famille-conscient : il lit le nibble de version du 1er octet et exige ≥ 20 octets pour IPv4, ≥ 40 pour IPv6, sinon `Malformed`. Purement défensif (etherparse revalide derrière), mais cohérent. / **Family-aware NFQUEUE truncation pre-check**: the guard at the top of `parse_packet` always required 20 bytes (minimal IPv4 header) before etherparse decoding, whereas the IPv6 header is 40. The guard now reads the version nibble of the first byte and requires ≥ 20 bytes for IPv4, ≥ 40 for IPv6, else `Malformed`. Purely defensive (etherparse re-validates), but consistent.
+- **Parsing conntrack `-L` réparé (incluant IPv6)** : `parse_conntrack_line` n'acceptait que le format `conntrack -E` (préfixe horodatage `[epoch]` + type `[NEW]`/…). Les lignes `conntrack -L -o extended` — sans horodatage ni type, mais préfixées d'un label L3 (`ipv6 10`) — étaient toutes rejetées, si bien que `GetActiveConnections` (snapshot des connexions actives, introduit en 0.3.3) ne renvoyait jamais rien. Le parser accepte désormais les deux formats : horodatage et type d'événement optionnels (défaut `New`), protocole L4 repéré par nom pour ignorer le label L3. / **conntrack `-L` parsing fixed (IPv6 included)**: `parse_conntrack_line` only accepted the `conntrack -E` format (`[epoch]` timestamp prefix + `[NEW]`/… event type). `conntrack -L -o extended` lines — no timestamp nor type, but prefixed with an L3 label (`ipv6 10`) — were all rejected, so `GetActiveConnections` (active-connection snapshot, added in 0.3.3) never returned anything. The parser now accepts both formats: optional timestamp and event type (default `New`), L4 protocol located by name to skip the L3 label.
+
+### Tests / Tests
+
+- **Non-régression IPv6** ajoutée sur les chemins v6 non couverts : paquet IPv6 tronqué (20-39 octets) → `Malformed` propre sans panique ; ligne `conntrack -L -o extended` IPv6 (TCP `[ASSURED]` + UDP sans crochet) → adresses/protocole/ports v6 corrects ; listener TCP sur `[::1]:0` joignable par la sonde antilockout ; ligne `/proc/net/udp6` et `parse_hex_ipv6` (::1, port) → tuple correct. / **IPv6 regression tests** added on previously uncovered v6 paths: truncated IPv6 packet (20-39 bytes) → clean `Malformed` without panic; IPv6 `conntrack -L -o extended` line (TCP `[ASSURED]` + UDP without brackets) → correct v6 addresses/protocol/ports; TCP listener on `[::1]:0` reachable by the antilockout probe; `/proc/net/udp6` line and `parse_hex_ipv6` (::1, port) → correct tuple.
+
+### Notes / Notes
+
+- **Parité IPv6 constatée** : la table nftables `inet`, les parseurs `IpAddr` génériques, le filtre eBPF (`family == 10`), la lecture de `/proc/net/*6` et la sonde antilockout v6 couvrent déjà IPv6. L'ICMPv6/NDP n'est **volontairement pas** intercepté au niveau paquet NFQUEUE (parité stricte avec ICMPv4, hors périmètre d'une décision par-connexion) ; aucune variante `Protocol::Icmpv6` n'est introduite. / **Observed IPv6 parity**: the `inet` nftables table, generic `IpAddr` parsers, the eBPF filter (`family == 10`), `/proc/net/*6` reading and the v6 antilockout probe already cover IPv6. ICMPv6/NDP is **intentionally not** intercepted at the NFQUEUE packet level (strict parity with ICMPv4, out of scope for a per-connection decision); no `Protocol::Icmpv6` variant is introduced.
+
 ## [0.3.3] - 2026-07-16 · « Snapshot des connexions actives »
 
 ### Added / Ajoute

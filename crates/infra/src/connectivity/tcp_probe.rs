@@ -63,7 +63,7 @@ fn is_reachable_error(e: &io::Error) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::Ipv4Addr;
+    use std::net::{Ipv4Addr, Ipv6Addr};
     use tokio::net::TcpListener;
 
     #[tokio::test]
@@ -76,6 +76,24 @@ mod tests {
     async fn local_listener_is_reachable() {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
         let addr = listener.local_addr().unwrap();
+        let probe = TcpProbe::new(vec![addr], Duration::from_secs(2)).unwrap();
+        assert_eq!(probe.probe().await.unwrap(), ProbeOutcome::Reachable);
+    }
+
+    #[tokio::test]
+    async fn local_ipv6_listener_is_reachable() {
+        // Parité IPv6 de la sonde antilockout : un listener TCP sur [::1]:0 (port éphémère) doit
+        // être joignable via l'adresse v6 obtenue. Miroir de `local_listener_is_reachable` (v4).
+        // IPv6 parity for the antilockout probe: a TCP listener on [::1]:0 (ephemeral port) must be
+        // reachable via the resolved v6 address. Mirror of `local_listener_is_reachable` (v4).
+        let listener = match TcpListener::bind((Ipv6Addr::LOCALHOST, 0)).await {
+            Ok(l) => l,
+            // Environnement CI sans IPv6 loopback : on ne fait pas échouer la suite.
+            // CI environment without IPv6 loopback: do not fail the suite.
+            Err(_) => return,
+        };
+        let addr = listener.local_addr().unwrap();
+        assert!(addr.is_ipv6());
         let probe = TcpProbe::new(vec![addr], Duration::from_secs(2)).unwrap();
         assert_eq!(probe.probe().await.unwrap(), ProbeOutcome::Reachable);
     }
