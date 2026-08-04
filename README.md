@@ -3,7 +3,7 @@
   <img src="https://img.shields.io/badge/Tauri-2-blue?logo=tauri" alt="Tauri">
   <img src="https://img.shields.io/badge/Svelte-5-ff3e00?logo=svelte" alt="Svelte">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT">
-  <img src="https://img.shields.io/badge/Tests-250-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-356-brightgreen" alt="Tests">
   <a href="https://github.com/yrbane/SysWall/actions/workflows/ci.yml">
     <img src="https://github.com/yrbane/SysWall/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>

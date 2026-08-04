@@ -3,6 +3,12 @@
 Toutes les modifications notables seront documentees ici.
 All notable changes documented here.
 
+## [0.3.5] - 2026-08-04 · « Rattrapage du changelog anglais »
+
+### Documentation
+
+- **Création de `CHANGELOG.en.md`** : ce fichier manquait ; il rattrape désormais l'historique complet (0.2.0 → 0.3.4) afin que le changelog anglais reste synchronisé avec le français à l'avenir, entrée pour entrée, même commit.
+
 ## [0.3.4] - 2026-07-16 · « Durcissement IPv6 »
 
 ### Fixed / Corrige
