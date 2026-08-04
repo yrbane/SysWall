@@ -3,6 +3,21 @@
 All notable changes documented here. Canonical/reference version: `CHANGELOG.md` (French).
 Toutes les modifications notables sont documentees ici. Version canonique/de reference : `CHANGELOG.md` (francais).
 
+## [0.3.7] - 2026-08-04 · "Catching up three merged fixes"
+
+### Fixed
+
+- **quick-xml/plist vulnerabilities fixed (RUSTSEC-2026-0194/0195)**: a Tauri bump had made the historical workaround for these two high-severity advisories (quadratic DoS / unbounded allocation) obsolete. `cargo update -p plist` now resolves plist 1.10.0 (quick-xml >= 0.41 dependency), which fixes them. On the UI side, `npm audit fix` fixed postcss and `cookie` is pinned to `^0.7.2` via an npm `overrides` (SvelteKit still depends on `cookie ^0.6.0`). The CI `audit` job's `--ignore RUSTSEC-2026-0194/0195` flags are now harmless no-ops.
+- **Expired temporary rules re-applied on startup**: `RuleRepository::list_enabled_ordered()` only filtered on `enabled = 1` in SQL, without excluding already-expired `RuleScope::Temporary { expires_at }` rules. This list feeds the nftables resync on daemon startup: a temporary rule ("block Firefox for 1h") kept being re-applied on every restart, even long after expiring. `RuleService::create_rule` now also rejects creating a temporary rule whose expiration is already in the past.
+
+### Changed
+
+- **Removed `firewall.rollback_timeout_secs`**: this config field was never read (flagged by the 2026-05-04 audit); the antilockout guard actually uses `AntilockoutConfig::timeout_secs` (`[antilockout]` section). Backward-compatible: serde silently ignores unknown TOML keys, so an existing config keeping the line still loads normally.
+
+### Documentation
+
+- **README test counter fixed (356 → 358)**: new drift observed (third occurrence after 250 → 356 in 0.3.5/0.3.6) across the 4 mentions (badge, TDD principle, `cargo test` block, Statistics table).
+
 ## [0.3.6] - 2026-08-04 · "Test badge and counters up to date"
 
 ### Documentation

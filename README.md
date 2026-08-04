@@ -3,7 +3,7 @@
   <img src="https://img.shields.io/badge/Tauri-2-blue?logo=tauri" alt="Tauri">
   <img src="https://img.shields.io/badge/Svelte-5-ff3e00?logo=svelte" alt="Svelte">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT">
-  <img src="https://img.shields.io/badge/Tests-356-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-358-brightgreen" alt="Tests">
   <a href="https://github.com/yrbane/SysWall/actions/workflows/ci.yml">
     <img src="https://github.com/yrbane/SysWall/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
@@ -100,7 +100,7 @@ Le programme BPF (`crates/ebpf-prog`) est compile separement avec `aya-ebpf` (ta
 ### Principes
 
 - **Architecture hexagonale** (ports & adapters) — le domain ne connait pas l'infrastructure
-- **TDD** — 356 tests unitaires et d'integration
+- **TDD** — 358 tests unitaires et d'integration
 - **SOLID, DRY, KISS**
 - **Separation des privileges** — daemon root avec capabilities restreintes, UI userspace
 - **Event-driven** — EventBus interne tokio broadcast
@@ -211,7 +211,7 @@ refresh_interval_ms = 1000
 ## Tests & Benchmarks
 
 ```bash
-# Tous les tests (356 tests)
+# Tous les tests (358 tests)
 cargo test --workspace
 
 # Tests d'integration nftables/conntrack (necessite root)
@@ -392,7 +392,7 @@ syswall/
 
 | Metrique / Metric | Valeur / Value |
 |---|---|
-| Tests | **356** (unitaires + integration SQLite) |
+| Tests | **358** (unitaires + integration SQLite) |
 | Crates Rust | 7 (+1 programme BPF) |
 | Fichiers Rust | ~85 |
 | Lignes Rust | ~13 000 |
