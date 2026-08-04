@@ -184,7 +184,6 @@ audit_flush_interval_secs = 2
 
 [firewall]
 default_policy = "ask"                # ask | allow | block
-rollback_timeout_secs = 30
 nftables_table_name = "syswall"
 
 [monitoring]

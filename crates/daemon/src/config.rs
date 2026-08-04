@@ -48,14 +48,11 @@ pub struct DatabaseConfig {
     pub audit_flush_interval_secs: u64,
 }
 
-/// Firewall configuration (default policy, rollback, nftables).
-/// Configuration du pare-feu (politique par défaut, retour arrière, nftables).
-// rollback_timeout_secs : présent dans la config TOML, prévu pour le mécanisme de rollback.
-#[allow(dead_code)]
+/// Firewall configuration (default policy, nftables).
+/// Configuration du pare-feu (politique par défaut, nftables).
 #[derive(Debug, Deserialize)]
 pub struct FirewallConfig {
     pub default_policy: DefaultPolicyConfig,
-    pub rollback_timeout_secs: u64,
     pub nftables_table_name: String,
     #[serde(default = "default_nft_path")]
     pub nft_binary_path: std::path::PathBuf,
@@ -314,7 +311,6 @@ audit_flush_interval_secs = 2
 
 [firewall]
 default_policy = "ask"
-rollback_timeout_secs = 30
 nftables_table_name = "syswall"
 nft_binary_path = "/usr/sbin/nft"
 nft_command_timeout_secs = 5
