@@ -13,7 +13,6 @@ audit_flush_interval_secs = 2
 
 [firewall]
 default_policy = "ask"
-rollback_timeout_secs = 30
 nftables_table_name = "syswall"
 nft_binary_path = "/usr/sbin/nft"
 nft_command_timeout_secs = 5

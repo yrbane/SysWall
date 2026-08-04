@@ -168,6 +168,7 @@ impl RuleRepository for SqliteRuleRepository {
                     .query_map([], Self::row_to_rule)
                     .map_err(|e| DomainError::Infrastructure(e.to_string()))?
                     .filter_map(|r| r.ok())
+                    .filter(|rule| !rule.is_expired())
                     .collect();
 
                 Ok(rules)
@@ -254,6 +255,37 @@ mod tests {
         assert_eq!(enabled.len(), 2);
         assert_eq!(enabled[0].name, "First");
         assert_eq!(enabled[1].name, "Second");
+    }
+
+    #[tokio::test]
+    async fn list_enabled_ordered_excludes_expired_temporary_rules() {
+        let (repo, _) = setup().await;
+
+        let mut expired = test_rule();
+        expired.name = "Expired".to_string();
+        expired.scope = RuleScope::Temporary {
+            expires_at: Utc::now() - chrono::Duration::hours(1),
+        };
+
+        let mut still_valid = test_rule();
+        still_valid.name = "StillValid".to_string();
+        still_valid.scope = RuleScope::Temporary {
+            expires_at: Utc::now() + chrono::Duration::hours(1),
+        };
+
+        let mut permanent = test_rule();
+        permanent.name = "Permanent".to_string();
+
+        repo.save(&expired).await.unwrap();
+        repo.save(&still_valid).await.unwrap();
+        repo.save(&permanent).await.unwrap();
+
+        let enabled = repo.list_enabled_ordered().await.unwrap();
+        let names: Vec<&str> = enabled.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(enabled.len(), 2);
+        assert!(names.contains(&"StillValid"));
+        assert!(names.contains(&"Permanent"));
+        assert!(!names.contains(&"Expired"));
     }
 
     #[tokio::test]

@@ -34,6 +34,15 @@ impl RuleService {
     /// Crée une nouvelle règle, la persiste, l'applique au pare-feu, et publie un événement.
     pub async fn create_rule(&self, cmd: CreateRuleCommand) -> Result<Rule, DomainError> {
         let now = Utc::now();
+
+        if let syswall_domain::entities::RuleScope::Temporary { expires_at } = cmd.scope
+            && expires_at <= now
+        {
+            return Err(DomainError::Validation(
+                "Temporary rule expires_at must be in the future".to_string(),
+            ));
+        }
+
         let rule = Rule {
             id: RuleId::new(),
             name: cmd.name,
@@ -170,6 +179,32 @@ mod tests {
         let calls = firewall.calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
         assert!(matches!(calls[0], FirewallCall::ApplyRule(_)));
+    }
+
+    #[tokio::test]
+    async fn create_rule_with_already_expired_scope_rejected() {
+        let (service, repo, firewall) = setup();
+        let cmd = CreateRuleCommand {
+            name: "Already expired".to_string(),
+            priority: 10,
+            criteria: RuleCriteria::default(),
+            effect: RuleEffect::Block,
+            scope: RuleScope::Temporary {
+                expires_at: Utc::now() - chrono::Duration::hours(1),
+            },
+            source: RuleSource::Manual,
+        };
+
+        let result = service.create_rule(cmd).await;
+        assert!(matches!(result, Err(DomainError::Validation(_))));
+
+        // Neither persisted nor applied to the firewall.
+        let all = repo
+            .find_all(&RuleFilters::default(), &Pagination::default())
+            .await
+            .unwrap();
+        assert!(all.is_empty());
+        assert!(firewall.calls.lock().unwrap().is_empty());
     }
 
     #[tokio::test]
