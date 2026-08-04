@@ -3,6 +3,12 @@
 Toutes les modifications notables seront documentees ici.
 All notable changes documented here.
 
+## [0.3.6] - 2026-08-04 · « Badge et compteur de tests à jour »
+
+### Documentation
+
+- **Compteur de tests du README corrigé** : le badge avait été corrigé en 0.3.5 (250 → 356, dérive constatée sur plusieurs versions), mais trois autres mentions textuelles ("TDD — 250 tests", "Tous les tests (250 tests)", tableau Statistiques) avaient été oubliées dans cette même passe. Alignées sur le compte réel (`cargo test --workspace --exclude ui`) : 356.
+
 ## [0.3.5] - 2026-08-04 · « Rattrapage du changelog anglais »
 
 ### Documentation

@@ -3,6 +3,12 @@
 All notable changes documented here. Canonical/reference version: `CHANGELOG.md` (French).
 Toutes les modifications notables sont documentees ici. Version canonique/de reference : `CHANGELOG.md` (francais).
 
+## [0.3.6] - 2026-08-04 · "Test badge and counters up to date"
+
+### Documentation
+
+- **README test counter fixed**: the badge was fixed in 0.3.5 (250 → 356, drifted over several versions), but three other textual mentions ("TDD — 250 tests", "All tests (250 tests)", Statistics table) were missed in that same pass. Aligned with the real count (`cargo test --workspace --exclude ui`): 356.
+
 ## [0.3.5] - 2026-08-04 · "English changelog catch-up"
 
 ### Documentation

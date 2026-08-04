@@ -100,7 +100,7 @@ Le programme BPF (`crates/ebpf-prog`) est compile separement avec `aya-ebpf` (ta
 ### Principes
 
 - **Architecture hexagonale** (ports & adapters) — le domain ne connait pas l'infrastructure
-- **TDD** — 250 tests unitaires et d'integration
+- **TDD** — 356 tests unitaires et d'integration
 - **SOLID, DRY, KISS**
 - **Separation des privileges** — daemon root avec capabilities restreintes, UI userspace
 - **Event-driven** — EventBus interne tokio broadcast
@@ -212,7 +212,7 @@ refresh_interval_ms = 1000
 ## Tests & Benchmarks
 
 ```bash
-# Tous les tests (250 tests)
+# Tous les tests (356 tests)
 cargo test --workspace
 
 # Tests d'integration nftables/conntrack (necessite root)
@@ -393,7 +393,7 @@ syswall/
 
 | Metrique / Metric | Valeur / Value |
 |---|---|
-| Tests | **250** (unitaires + integration SQLite) |
+| Tests | **356** (unitaires + integration SQLite) |
 | Crates Rust | 7 (+1 programme BPF) |
 | Fichiers Rust | ~85 |
 | Lignes Rust | ~13 000 |
