@@ -26,6 +26,9 @@ struct CacheEntry {
 pub struct DnsResolver {
     cache: Arc<Mutex<LruCache<IpAddr, CacheEntry>>>,
     ttl: Duration,
+    /// Cache de snooping DNS consulté avant le reverse-DNS (None = désactivé).
+    /// DNS snoop cache consulted before reverse-DNS (None = disabled).
+    snoop: Option<Arc<crate::dns::snooper::DnsSnoopCache>>,
 }
 
 impl DnsResolver {
@@ -37,7 +40,20 @@ impl DnsResolver {
         Self {
             cache: Arc::new(Mutex::new(LruCache::new(cap))),
             ttl: Duration::from_secs(ttl_secs),
+            snoop: None,
         }
+    }
+
+    /// Comme `new`, mais consulte d'abord un cache de snooping DNS.
+    /// Like `new`, but consults a DNS snoop cache first.
+    pub fn with_snoop(
+        capacity: usize,
+        ttl_secs: u64,
+        snoop: Arc<crate::dns::snooper::DnsSnoopCache>,
+    ) -> Self {
+        let mut r = Self::new(capacity, ttl_secs);
+        r.snoop = Some(snoop);
+        r
     }
 }
 
@@ -52,6 +68,14 @@ impl DnsResolverPort for DnsResolver {
     /// Resolve the hostname for the given IP, using cache when possible.
     /// Résout le nom d'hôte pour l'IP donnée, en utilisant le cache si possible.
     async fn resolve(&self, ip: IpAddr) -> Result<Option<String>, DomainError> {
+        // Le domaine réellement demandé par l'appli prime sur le PTR reverse.
+        // The domain the app actually requested wins over the reverse PTR.
+        if let Some(ref snoop) = self.snoop
+            && let Some(host) = snoop.get(&ip)
+        {
+            return Ok(Some(host));
+        }
+
         // Check cache first
         // Vérification du cache en premier
         {
@@ -112,5 +136,16 @@ mod tests {
         // Deuxième appel — doit utiliser le cache
         let second = resolver.resolve(ip).await.unwrap();
         assert_eq!(first, second);
+    }
+
+    #[tokio::test]
+    async fn resolve_prefers_snoop_cache_over_reverse() {
+        use crate::dns::snooper::DnsSnoopCache;
+        let snoop = Arc::new(DnsSnoopCache::new(300));
+        let ip: IpAddr = "93.184.216.34".parse().unwrap();
+        snoop.insert(ip, "example.com".to_string(), Some(300));
+        let resolver = DnsResolver::with_snoop(128, 300, snoop);
+        let got = resolver.resolve(ip).await.unwrap();
+        assert_eq!(got, Some("example.com".to_string()));
     }
 }
