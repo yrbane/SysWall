@@ -3,6 +3,12 @@
 Toutes les modifications notables seront documentees ici.
 All notable changes documented here.
 
+## [0.3.8] - 2026-08-05 · « Réinstallation sans ETXTBSY »
+
+### Corrige
+
+- **`install.sh` arrête le daemon avant de remplacer son binaire** : lors d'une réinstallation, `sudo cp target/release/syswall-daemon /usr/bin/` échouait avec `Fichier texte occupé` (ETXTBSY) parce que le daemon tournait encore — le noyau refuse d'écraser l'image d'un exécutable en cours d'exécution. Le `systemctl restart` final n'était jamais atteint. L'étape `[3/9]` arrête désormais le service (`systemctl is-active --quiet syswall`) avant la copie ; il est relancé en fin de script comme auparavant. Sans impact sur une première installation (rien à arrêter).
+
 ## [0.3.7] - 2026-08-04 · « Rattrapage de trois correctifs fusionnés »
 
 ### Corrige

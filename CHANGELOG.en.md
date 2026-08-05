@@ -3,6 +3,12 @@
 All notable changes documented here. Canonical/reference version: `CHANGELOG.md` (French).
 Toutes les modifications notables sont documentees ici. Version canonique/de reference : `CHANGELOG.md` (francais).
 
+## [0.3.8] - 2026-08-05 · "Reinstall without ETXTBSY"
+
+### Fixed
+
+- **`install.sh` stops the daemon before replacing its binary**: on a reinstall, `sudo cp target/release/syswall-daemon /usr/bin/` failed with `Text file busy` (ETXTBSY) because the daemon was still running — the kernel refuses to overwrite the image of a running executable. The final `systemctl restart` was never reached. Step `[3/9]` now stops the service (`systemctl is-active --quiet syswall`) before copying; it is restarted at the end of the script as before. No effect on a first-time install (nothing to stop).
+
 ## [0.3.7] - 2026-08-04 · "Catching up three merged fixes"
 
 ### Fixed

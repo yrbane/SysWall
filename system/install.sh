@@ -86,6 +86,14 @@ fi
 
 # Copie des binaires
 echo "[3/9] Installation des binaires..."
+# Arret du daemon s'il tourne deja, sinon la copie echoue avec ETXTBSY
+# (« Fichier texte occupe ») lors d'une reinstallation. Il est relance en fin de script.
+# Stop the daemon if already running, otherwise the copy fails with ETXTBSY
+# ("text file busy") on reinstall. It is restarted at the end of the script.
+if systemctl is-active --quiet syswall 2>/dev/null; then
+    echo "  -> arret du daemon en cours (reinstallation)"
+    sudo systemctl stop syswall
+fi
 sudo cp target/release/syswall-daemon /usr/bin/
 sudo chmod 755 /usr/bin/syswall-daemon
 if [ -n "$UI_BIN" ] && [ -f "$UI_BIN" ]; then
