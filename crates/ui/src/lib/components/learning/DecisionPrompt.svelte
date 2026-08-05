@@ -34,6 +34,7 @@
         process_path: raw.process_path?.['0'] || raw.process_path || undefined,
         user: raw.user || undefined,
         icon: raw.process?.icon || raw.icon || undefined,
+        hostname: raw.hostname || undefined,
       } as ConnectionSnapshot;
     } catch {
       return null;
@@ -93,6 +94,10 @@
   function handleIconError() {
     iconBroken = true;
   }
+
+  // Cible lisible : hostname si connu, sinon IP. / Human-readable target: hostname if known, else IP.
+  const destLabel = $derived(snapshot?.hostname || snapshot?.destination?.ip || '--');
+  const appLabel = $derived(snapshot?.process_name || fr.conn_unknown);
 
   function handleAction(action: DecisionAction) {
     // Default granularity: app_and_destination for persistent actions, app_only for one-time
@@ -193,6 +198,12 @@
         </div>
       </div>
 
+      <div class="summary-line">
+        <span class="summary-app">{appLabel}</span>
+        <span class="summary-arrow">→</span>
+        <span class="summary-target font-mono">{destLabel}:{snapshot.destination?.port || '--'}</span>
+      </div>
+
       <div class="detail-grid">
         <div class="detail-item">
           <span class="detail-label">{fr.conn_user}</span>
@@ -204,7 +215,9 @@
         </div>
         <div class="detail-item">
           <span class="detail-label">{fr.learn_destination}</span>
-          <span class="detail-value font-mono">{snapshot.destination?.ip || '--'}:{snapshot.destination?.port || '--'}</span>
+          <span class="detail-value font-mono">
+            {#if snapshot.hostname}{snapshot.hostname}<span class="text-tertiary text-xs"> ({snapshot.destination?.ip})</span>{:else}{snapshot.destination?.ip || '--'}{/if}:{snapshot.destination?.port || '--'}
+          </span>
         </div>
         <div class="detail-item">
           <span class="detail-label">{fr.conn_protocol}</span>
@@ -310,6 +323,17 @@
     flex-direction: column;
     gap: var(--space-3);
   }
+
+  .summary-line {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-base);
+    padding: var(--space-2) 0;
+  }
+  .summary-app { font-weight: var(--font-weight-semibold); color: var(--text-primary); }
+  .summary-arrow { color: var(--text-tertiary); }
+  .summary-target { color: var(--accent-cyan); }
 
   .app-header {
     display: flex;
