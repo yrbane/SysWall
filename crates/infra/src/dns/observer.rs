@@ -1,7 +1,13 @@
 //! Observation DNS : extrait les réponses DNS des paquets NFQUEUE et alimente le cache.
 //! DNS observation: extracts DNS responses from NFQUEUE packets and feeds the cache.
 
+use std::sync::Arc;
+
 use etherparse::{SlicedPacket, TransportSlice};
+use tokio_util::sync::CancellationToken;
+use tracing::{error, info};
+
+use syswall_domain::errors::DomainError;
 
 use crate::dns::snooper::{parse_dns_response, DnsSnoopCache};
 
@@ -31,6 +37,59 @@ pub fn ingest_dns_packet(packet: &[u8], cache: &DnsSnoopCache) -> usize {
         cache.insert(ip, host, Some(ttl));
     }
     n
+}
+
+/// Ouvre la queue `queue_num`, ingère chaque réponse DNS puis verdict ACCEPT (toujours).
+/// Boucle bloquante jusqu'à annulation — à lancer via `spawn_blocking`.
+/// Open queue `queue_num`, ingest each DNS response then verdict ACCEPT (always).
+/// Blocking loop until cancellation — launch via `spawn_blocking`.
+pub fn run_dns_observer(
+    queue_num: u16,
+    cache: Arc<DnsSnoopCache>,
+    cancel: CancellationToken,
+) -> Result<(), DomainError> {
+    let mut queue = nfq::Queue::open()
+        .map_err(|e| DomainError::Infrastructure(format!("dns nfq::open: {e}")))?;
+    queue
+        .bind(queue_num)
+        .map_err(|e| DomainError::Infrastructure(format!("dns nfq::bind({queue_num}): {e}")))?;
+    // Mode non-bloquant pour pouvoir sonder le token d'annulation.
+    // Non-blocking mode to be able to poll the cancel token.
+    queue.set_nonblocking(true);
+
+    info!(target: "dns_observe", queue_num, "queue d'observation DNS ouverte et liée");
+
+    loop {
+        if cancel.is_cancelled() {
+            info!(target: "dns_observe", queue_num, "token annulé, fermeture de la queue DNS");
+            break;
+        }
+
+        let mut msg = match queue.recv() {
+            Ok(m) => m,
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(std::time::Duration::from_millis(1));
+                continue;
+            }
+            // EINTR (signal reçu) : réessayer. / EINTR (signal received): retry.
+            Err(e) if e.raw_os_error() == Some(4) => continue,
+            Err(e) => {
+                error!(target: "dns_observe", error = %e, "erreur recv nfq DNS");
+                return Err(DomainError::Infrastructure(format!("dns nfq::recv: {e}")));
+            }
+        };
+
+        // Best-effort : une erreur d'ingestion ne doit jamais bloquer le DNS.
+        // Best-effort: an ingestion error must never block DNS.
+        let _ = ingest_dns_packet(msg.get_payload(), &cache);
+        msg.set_verdict(nfq::Verdict::Accept);
+        if let Err(e) = queue.verdict(msg) {
+            error!(target: "dns_observe", error = %e, "erreur verdict nfq DNS");
+            return Err(DomainError::Infrastructure(format!("dns nfq::verdict: {e}")));
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

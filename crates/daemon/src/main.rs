@@ -297,6 +297,10 @@ async fn run() -> Result<(), StartupError> {
     // Launch the NFQUEUE interceptor (degraded mode if CAP_NET_ADMIN is missing)
     bootstrap::wire_nfqueue(&ctx, &config, cancel.clone());
 
+    // Lance l'observateur DNS (snooping IP→domaine pour l'identité des connexions)
+    // Launch the DNS observer (IP→domain snooping for connection identity)
+    bootstrap::wire_dns_observer(&ctx, cancel.clone());
+
     info!("SysWall daemon ready");
 
     // Notify systemd that we're ready

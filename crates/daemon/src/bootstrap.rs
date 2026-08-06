@@ -24,6 +24,8 @@ use syswall_domain::ports::{ConnectionMonitor, FirewallEngine, ProcessResolver};
 use syswall_ebpf::{EbpfProcessResolver, HybridProcessResolver};
 use syswall_infra::connectivity::TcpProbe;
 use syswall_infra::conntrack::{ConntrackConfig, ConntrackMonitorAdapter};
+use syswall_infra::dns::observer::run_dns_observer;
+use syswall_infra::dns::snooper::DnsSnoopCache;
 use syswall_infra::dns::DnsResolver as InfraDnsResolver;
 use syswall_infra::event_bus::TokioBroadcastEventBus;
 use syswall_infra::nftables::{NftablesConfig, NftablesFirewallAdapter};
@@ -54,6 +56,12 @@ pub struct AppContext {
     /// Rule repository reference for whitelist creation.
     /// Reference au depot de regles pour la creation de la liste blanche.
     pub rule_repo: Arc<SqliteRuleRepository>,
+    /// Cache de snooping DNS partagé (alimenté par l'observateur, lu par le resolver).
+    /// Shared DNS snoop cache (fed by the observer, read by the resolver).
+    pub dns_snoop: Arc<DnsSnoopCache>,
+    /// Numéro de queue NFQUEUE d'observation DNS (None = désactivée).
+    /// DNS-observation NFQUEUE queue number (None = disabled).
+    pub dns_observe_queue: Option<u16>,
 }
 
 /// Wire up all dependencies and return the application context.
@@ -136,7 +144,11 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
         // Activation de la chaîne d'interception NFQUEUE si configurée.
         // Enable the NFQUEUE interception chain if configured.
         let nft_adapter = if let Some(nfq) = config.nfqueue.as_ref().filter(|c| c.enabled) {
-            nft_adapter.with_interception_queue(nfq.queue_num)
+            // Observation DNS sur une queue distincte (interception + 1).
+            // DNS observation on a distinct queue (interception + 1).
+            nft_adapter
+                .with_interception_queue(nfq.queue_num)
+                .with_dns_observe_queue(nfq.queue_num.wrapping_add(1))
         } else {
             nft_adapter
         };
@@ -199,11 +211,21 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
 
     let notifier = Arc::new(FakeUserNotifier::new());
 
-    // DNS resolver (LRU cache, capacity 4096, TTL 300s)
-    // Résolveur DNS (cache LRU, capacité 4096, TTL 300s)
-    let dns_resolver = Arc::new(InfraDnsResolver::new(
+    // Cache de snooping DNS partagé entre l'observateur NFQUEUE et le resolver.
+    // Shared DNS snoop cache between the NFQUEUE observer and the resolver.
+    let dns_snoop = Arc::new(DnsSnoopCache::new(config.monitoring.dns_cache_ttl_secs));
+    let dns_observe_queue = config
+        .nfqueue
+        .as_ref()
+        .filter(|c| c.enabled)
+        .map(|c| c.queue_num.wrapping_add(1));
+
+    // DNS resolver (LRU cache, capacity 4096, TTL 300s) — consulte le snoop d'abord.
+    // Résolveur DNS (cache LRU, capacité 4096, TTL 300s) — consulte le snoop d'abord.
+    let dns_resolver = Arc::new(InfraDnsResolver::with_snoop(
         config.monitoring.dns_cache_capacity,
         config.monitoring.dns_cache_ttl_secs,
+        dns_snoop.clone(),
     ));
 
     // Application services
@@ -254,6 +276,8 @@ pub fn bootstrap(config: &SysWallConfig) -> Result<AppContext, StartupError> {
         connection_monitor,
         firewall,
         rule_repo,
+        dns_snoop,
+        dns_observe_queue,
     })
 }
 
@@ -299,6 +323,40 @@ pub fn wire_nfqueue(
                     format!("nfqueue interception failed (mode degrade): {e}"),
                 );
                 let _ = audit_repo.append(&event).await;
+            }
+        }
+    });
+}
+
+/// Lance l'observateur DNS (boucle NFQUEUE + éviction périodique du cache) en tâches de fond.
+/// Spawn the DNS observer (NFQUEUE loop + periodic cache eviction) as background tasks.
+///
+/// Doit être appelé après `bootstrap()`. No-op si l'observation DNS est désactivée.
+/// Must be called after `bootstrap()`. No-op if DNS observation is disabled.
+pub fn wire_dns_observer(ctx: &AppContext, cancel: tokio_util::sync::CancellationToken) {
+    let Some(queue_num) = ctx.dns_observe_queue else {
+        return;
+    };
+
+    // Boucle bloquante d'ingestion des réponses DNS (thread OS dédié).
+    // Blocking DNS-response ingestion loop (dedicated OS thread).
+    let obs_cache = ctx.dns_snoop.clone();
+    let obs_cancel = cancel.clone();
+    tokio::task::spawn_blocking(move || {
+        if let Err(e) = run_dns_observer(queue_num, obs_cache, obs_cancel) {
+            tracing::error!(target: "dns_observe", "observation DNS interrompue (mode degrade): {e}");
+        }
+    });
+
+    // Éviction périodique des entrées DNS expirées.
+    // Periodic eviction of expired DNS entries.
+    let evict_cache = ctx.dns_snoop.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
+        loop {
+            tokio::select! {
+                _ = cancel.cancelled() => break,
+                _ = tick.tick() => evict_cache.evict_expired(),
             }
         }
     });
