@@ -9,7 +9,7 @@ use tracing::{error, info};
 
 use syswall_domain::errors::DomainError;
 
-use crate::dns::snooper::{parse_dns_response, DnsSnoopCache};
+use crate::dns::snooper::{DnsSnoopCache, parse_dns_response};
 
 /// Extrait le payload UDP d'un paquet IP (couche 3). Retourne None si non-UDP ou tronqué.
 /// Extract the UDP payload from an IP packet (layer 3). Returns None if non-UDP or truncated.
@@ -85,7 +85,9 @@ pub fn run_dns_observer(
         msg.set_verdict(nfq::Verdict::Accept);
         if let Err(e) = queue.verdict(msg) {
             error!(target: "dns_observe", error = %e, "erreur verdict nfq DNS");
-            return Err(DomainError::Infrastructure(format!("dns nfq::verdict: {e}")));
+            return Err(DomainError::Infrastructure(format!(
+                "dns nfq::verdict: {e}"
+            )));
         }
     }
 
