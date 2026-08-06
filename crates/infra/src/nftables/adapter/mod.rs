@@ -64,6 +64,9 @@ pub struct NftablesFirewallAdapter {
     /// Numéro de queue NFQUEUE pour la chaîne d'interception (None = désactivé).
     /// NFQUEUE queue number for the interception chain (None = disabled).
     interception_queue: Option<u16>,
+    /// Numéro de queue NFQUEUE pour l'observation des réponses DNS (None = désactivé).
+    /// NFQUEUE queue number for DNS-response observation (None = disabled).
+    dns_observe_queue: Option<u16>,
 }
 
 impl std::fmt::Debug for NftablesFirewallAdapter {
@@ -93,6 +96,7 @@ impl NftablesFirewallAdapter {
             nftables_synced: Mutex::new(false),
             lockout_guard: None,
             interception_queue: None,
+            dns_observe_queue: None,
         })
     }
 
@@ -100,6 +104,13 @@ impl NftablesFirewallAdapter {
     /// Enable the NFQUEUE interception chain with the given queue number.
     pub fn with_interception_queue(mut self, queue_num: u16) -> Self {
         self.interception_queue = Some(queue_num);
+        self
+    }
+
+    /// Active la chaîne d'observation DNS (hook input) avec le numéro de queue donné.
+    /// Enable the DNS-observation chain (input hook) with the given queue number.
+    pub fn with_dns_observe_queue(mut self, queue_num: u16) -> Self {
+        self.dns_observe_queue = Some(queue_num);
         self
     }
 
@@ -214,8 +225,46 @@ impl NftablesFirewallAdapter {
             );
         }
 
+        // Chaîne d'observation DNS (optionnelle) : queue les réponses DNS entrantes
+        // pour le snooping IP→domaine. bypass = fail-open, ne casse jamais le DNS.
+        // DNS-observation chain (optional): queue inbound DNS responses for IP→domain
+        // snooping. bypass = fail-open, never breaks DNS.
+        if let Some(queue_num) = self.dns_observe_queue {
+            self.execute_nft(&NftCommandBuilder::create_chain(
+                table,
+                "dns_observe",
+                "input",
+                0,
+            ))
+            .await?;
+
+            let dns_rule = dns_observe_queue_rule(table, queue_num);
+            let _ = self.execute_nft(&dns_rule).await;
+
+            info!(
+                target: "nfqueue",
+                table = %table,
+                queue_num = queue_num,
+                "chaîne d'observation DNS installée"
+            );
+        }
+
         Ok(())
     }
+}
+
+/// Construit la règle nft qui queue les réponses DNS (udp sport 53) vers `queue_num`,
+/// avec `bypass` (fail-open). / Build the nft rule that queues DNS responses
+/// (udp sport 53) to `queue_num`, with `bypass` (fail-open).
+fn dns_observe_queue_rule(table: &str, queue_num: u16) -> NftCommandBuilder {
+    NftCommandBuilder::add_rule(table, "dns_observe")
+        .arg("udp")
+        .arg("sport")
+        .arg("53")
+        .arg("queue")
+        .arg("num")
+        .arg(queue_num.to_string())
+        .arg("bypass")
 }
 
 #[async_trait]

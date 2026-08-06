@@ -105,3 +105,13 @@ fn whitelist_loopback_ipv4() {
     ));
     assert!(whitelist::is_whitelist_rule(&rule));
 }
+
+#[test]
+fn dns_observe_rule_queues_responses_with_bypass() {
+    let rule = super::dns_observe_queue_rule("syswall", 7);
+    let args = rule.args().join(" ");
+    assert!(args.contains("dns_observe"));
+    assert!(args.contains("udp sport 53"));
+    assert!(args.contains("queue num 7"));
+    assert!(args.contains("bypass"));
+}
