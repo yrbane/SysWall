@@ -3,6 +3,12 @@
 All notable changes documented here. Canonical/reference version: `CHANGELOG.md` (French).
 Toutes les modifications notables sont documentees ici. Version canonique/de reference : `CHANGELOG.md` (francais).
 
+## [0.3.9] - 2026-08-06 · "The prompt finally says what it is"
+
+### Added
+
+- **Destination identity in the new-connection prompt**: the window now shows the destination hostname (`github.com`) instead of a bare IP, with an "Application → host:port" summary line. The name comes first from **DNS snooping** (the domain the application actually requested, captured by observing DNS responses through a dedicated `input` nftables chain in fail-open `queue … bypass`), falling back to reverse-DNS then to the raw IP. Wiring: the resolver consults the snoop cache before the reverse lookup; an NFQUEUE consumer feeds that cache; a background task evicts expired entries. No new capability (reuses `CAP_NET_ADMIN`).
+
 ## [0.3.8] - 2026-08-05 · "Reinstall without ETXTBSY"
 
 ### Fixed

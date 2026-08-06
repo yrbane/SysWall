@@ -3,6 +3,12 @@
 Toutes les modifications notables seront documentees ici.
 All notable changes documented here.
 
+## [0.3.9] - 2026-08-06 · « Le prompt dit enfin ce que c'est »
+
+### Ajoute
+
+- **Identité de destination dans le prompt de nouvelle connexion** : la fenêtre affiche désormais le nom d'hôte de la destination (`github.com`) plutôt qu'une simple IP, avec une ligne résumé « Application → hôte:port ». Le nom provient d'abord du **snooping DNS** (le domaine réellement demandé par l'application, capturé en observant les réponses DNS via une chaîne nftables `input` dédiée en `queue … bypass` fail-open), avec repli sur le reverse-DNS puis sur l'IP brute. Câblé : le résolveur consulte le cache de snooping avant le reverse ; un consommateur NFQUEUE alimente ce cache ; une tâche de fond évince les entrées expirées. Aucune nouvelle capability (réutilise `CAP_NET_ADMIN`).
+
 ## [0.3.8] - 2026-08-05 · « Réinstallation sans ETXTBSY »
 
 ### Corrige
