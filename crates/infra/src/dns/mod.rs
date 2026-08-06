@@ -1,3 +1,4 @@
+pub mod observer;
 pub mod snooper;
 
 /// DNS resolver with LRU cache for reverse IP lookups.
